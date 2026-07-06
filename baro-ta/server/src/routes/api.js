@@ -1,0 +1,55 @@
+import { Router } from "express";
+import { parseIntent } from "../services/nlu.js";
+import { searchRoutes } from "../services/routes.js";
+import { checkSeat } from "../services/standby.js";
+import { createBooking, payBooking } from "../services/bookings.js";
+
+const router = Router();
+
+// 자연어 → 필수 파라미터 추출
+router.post("/nlu/parse", (req, res) => {
+  const { text } = req.body || {};
+  if (typeof text !== "string" || !text.trim()) {
+    return res.status(400).json({ error: "text가 필요합니다." });
+  }
+  const got = parseIntent(text);
+  const found = Object.entries(got)
+    .filter(([, v]) => v != null)
+    .map(([k, v]) =>
+      k === "origin" ? `출발지=${v}` : k === "dest" ? `도착지=${v}` : k === "date" ? `날짜=${v.md}` : `도착시각=${v.label}`
+    );
+  res.json({
+    got,
+    agent: found.length ? [{ tag: "NLU", msg: `파라미터 추출 → ${found.join(", ")}` }] : [],
+  });
+});
+
+// 경로 후보 검색 + AI 스코어링
+router.post("/routes/search", (req, res) => {
+  const { origin, dest, arriveBy } = req.body || {};
+  if (!origin || !dest || typeof arriveBy !== "number") {
+    return res.status(400).json({ error: "origin, dest, arriveBy(분)가 필요합니다." });
+  }
+  res.json(searchRoutes({ origin, dest, arriveBy }));
+});
+
+// 취소표 좌석 조회 (클라이언트가 랜덤 주기로 호출)
+router.get("/standby/:searchId/check", (req, res) => {
+  res.json(checkSeat(req.params.searchId));
+});
+
+// 자동 예매 시작 (결제 직전까지)
+router.post("/bookings", (req, res) => {
+  const { route, params } = req.body || {};
+  if (!route || !params) return res.status(400).json({ error: "route, params가 필요합니다." });
+  res.json(createBooking({ route, params }));
+});
+
+// 결제 확정 (사용자 제어 단계)
+router.post("/bookings/:id/pay", (req, res) => {
+  const result = payBooking(req.params.id);
+  if (!result) return res.status(404).json({ error: "예매를 찾을 수 없습니다." });
+  res.json(result);
+});
+
+export default router;
