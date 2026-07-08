@@ -1,5 +1,6 @@
 import { DIST_MIN, MODES, rand } from "../data.js";
 import { korailAvailable, markKorailDead, searchKorailTrains } from "./korail.js";
+import { kobusAvailable, kobusSupported, markKobusDead, searchKobusBuses } from "./kobus.js";
 
 /**
  * 경로 후보 산출 + AI 적합도 스코어링.
@@ -42,6 +43,9 @@ function localIsoTomorrow() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// 버스 등급별 요금 추정 (시간표에 요금이 노출되지 않는 등급용) — 거리(분) 비례
+const BUS_FARE_PER_MIN = { 고속: 170, 우등: 250, 심야고속: 190, 심야우등: 275, 프리미엄: 330 };
+
 async function realRoutes({ origin, dest, arriveBy, dateIso }) {
   const T = arriveBy;
   const date = (dateIso || localIsoTomorrow()).replaceAll("-", "");
@@ -49,9 +53,18 @@ async function realRoutes({ origin, dest, arriveBy, dateIso }) {
   const startMin = Math.max(0, T - 300);
   const time = `${String(Math.floor(startMin / 60)).padStart(2, "0")}${String(startMin % 60).padStart(2, "0")}00`;
 
-  const trains = await searchKorailTrains({ origin, dest, date, time });
+  const wantBus = kobusSupported(origin, dest) && kobusAvailable();
+  const [trainsRes, busesRes] = await Promise.allSettled([
+    searchKorailTrains({ origin, dest, date, time }),
+    wantBus ? searchKobusBuses({ origin, dest, date }) : Promise.resolve([]),
+  ]);
+  // 기차 조회 실패는 전체 폴백 사유, 버스 실패는 기차만으로 진행
+  if (trainsRes.status === "rejected") throw trainsRes.reason;
+  const trains = trainsRes.value;
+  const buses = busesRes.status === "fulfilled" ? busesRes.value : [];
+  if (busesRes.status === "rejected") markKobusDead();
 
-  const usable = trains
+  const usableTrains = trains
     .filter((t) => t.arrDate === date && t.arrMin <= T)
     .map((t, i) => ({
       id: `rt_${Date.now().toString(36)}_r${i}`,
@@ -66,9 +79,26 @@ async function realRoutes({ origin, dest, arriveBy, dateIso }) {
       soldOut: t.soldOut,
     }));
 
-  // 희망 도착시각에 가까운 순으로 상위 5개만 스코어링
-  usable.sort((a, b) => b.arr - a.arr);
-  const list = usable.slice(0, 5);
+  // KOBUS 시간표에는 도착시각이 없어 소요시간을 거리 기반으로 추정한다
+  const busDur = Math.round(((DIST_MIN[dest] || 120) * 1.7) / 5) * 5;
+  const usableBuses = buses
+    .map((b, i) => ({
+      id: `rt_${Date.now().toString(36)}_b${i}`,
+      mode: "고속버스",
+      cls: "bus",
+      no: `${b.company ?? "고속버스"} ${b.busClass}`,
+      dep: b.depMin,
+      arr: b.depMin + busDur,
+      dur: busDur,
+      price: b.fare ?? (DIST_MIN[dest] || 120) * (BUS_FARE_PER_MIN[b.busClass] ?? 170),
+      soldOut: b.soldOut,
+    }))
+    .filter((b) => b.arr <= T && b.arr >= T - 360);
+
+  // 희망 도착시각에 가까운 순으로 기차 4 + 버스 2를 스코어링
+  usableTrains.sort((a, b) => b.arr - a.arr);
+  usableBuses.sort((a, b) => b.arr - a.arr);
+  const list = [...usableTrains.slice(0, 4), ...usableBuses.slice(0, 2)];
   applyScores(list, T);
 
   // 시연 리허설용: 매진 열차가 없어도 취소표 흐름을 보여주고 싶을 때 켠다
@@ -81,9 +111,16 @@ async function realRoutes({ origin, dest, arriveBy, dateIso }) {
   }
 
   const agent = [
-    { tag: "KORAIL", msg: `코레일 실시간 조회 ${trains.length}건 → 조건 부합 ${list.length}건 (${origin} → ${dest}, ${date})` },
-    ...list.map((r) => ({ tag: "SCORE", msg: `${r.no} 적합도 ${r.score}점${r.soldOut ? " · 매진" : ""}` })),
+    { tag: "KORAIL", msg: `코레일 실시간 조회 ${trains.length}건 → 조건 부합 ${usableTrains.length}건 (${origin} → ${dest}, ${date})` },
   ];
+  if (wantBus) {
+    agent.push(
+      busesRes.status === "fulfilled"
+        ? { tag: "KOBUS", msg: `고속버스 시간표 ${buses.length}건 → 조건 부합 ${usableBuses.length}건` }
+        : { tag: "KOBUS", msg: "고속버스 조회 실패 → 기차만으로 진행" }
+    );
+  }
+  agent.push(...list.map((r) => ({ tag: "SCORE", msg: `${r.no} 적합도 ${r.score}점${r.soldOut ? " · 매진" : ""}` })));
   if (list[0]?.soldOut) agent.push({ tag: "AI", msg: "1위 경로 매진 감지 → 취소표 자동 조회 제안" });
 
   return { routes: list, agent };

@@ -5,6 +5,7 @@ import type {
   RouteOption,
   SearchResponse,
   StandbyCheckResponse,
+  TravelSuggestResponse,
   TripParams,
 } from "./types";
 
@@ -44,4 +45,7 @@ export const api = {
 
   pay: (bookingId: string) =>
     request<PayResponse>(`/api/bookings/${bookingId}/pay`, { method: "POST", body: "{}" }),
+
+  travelSuggest: (dest: string, checkIn: string) =>
+    request<TravelSuggestResponse>(`/api/travel/suggest?dest=${encodeURIComponent(dest)}&checkIn=${checkIn}`),
 };

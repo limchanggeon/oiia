@@ -100,3 +100,15 @@ export interface PayResponse {
   ticket: Ticket;
   agent: AgentLine[];
 }
+export interface TravelCard {
+  name: string;
+  rating: string | null;
+  price: string | null;
+  url: string;
+  img: string | null;
+}
+export interface TravelSuggestResponse {
+  stays: TravelCard[];
+  tnas: TravelCard[];
+  agent: AgentLine[];
+}

@@ -3,6 +3,7 @@ import { parseIntent } from "../services/nlu.js";
 import { searchRoutes } from "../services/routes.js";
 import { checkSeat } from "../services/standby.js";
 import { createBooking, payBooking } from "../services/bookings.js";
+import { suggestTravel } from "../services/myrealtrip.js";
 
 const router = Router();
 
@@ -47,6 +48,23 @@ router.post("/bookings", (req, res) => {
   const { route, params } = req.body || {};
   if (!route || !params) return res.status(400).json({ error: "route, params가 필요합니다." });
   res.json(createBooking({ route, params }));
+});
+
+// 도착지 숙소·투어 추천 (마이리얼트립 공식 MCP, 조회 전용)
+router.get("/travel/suggest", async (req, res) => {
+  const { dest, checkIn } = req.query;
+  if (!dest || !/^\d{4}-\d{2}-\d{2}$/.test(checkIn || "")) {
+    return res.status(400).json({ error: "dest, checkIn(YYYY-MM-DD)이 필요합니다." });
+  }
+  const d = new Date(`${checkIn}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  const checkOut = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const { stays, tnas } = await suggestTravel({ dest, checkIn, checkOut });
+  res.json({
+    stays,
+    tnas,
+    agent: [{ tag: "MRT", msg: `마이리얼트립 실시간 검색 — ${dest} 숙소 ${stays.length}건 · 즐길거리 ${tnas.length}건` }],
+  });
 });
 
 // 결제 확정 (사용자 제어 단계)

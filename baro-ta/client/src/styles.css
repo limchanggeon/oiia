@@ -507,6 +507,35 @@ button:focus-visible, input:focus-visible, label:focus-within { outline: 2px sol
 .ticket .t-grid b { font-size: var(--t-md); font-variant-numeric: tabular-nums; }
 .ticket canvas { display: block; width: 100%; height: 54px; margin-top: 16px; }
 
+/* 완료 패널: 마이리얼트립 이어서 예약 */
+.suggest { margin-top: 24px; text-align: left; }
+.sg-head { font-size: var(--t-md); font-weight: 800; }
+.sg-head span { font-size: var(--t-xs); color: var(--ink-soft); font-weight: 600; margin-left: 8px; }
+.sg-label { font-size: var(--t-xs); font-weight: 800; letter-spacing: 0.08em; color: var(--brand); margin: 14px 0 8px; }
+.sg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sg-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+.sg-card:hover { border-color: var(--brand); }
+.sg-card img { width: 100%; height: 92px; object-fit: cover; display: block; background: var(--brand-soft); }
+.sg-card b {
+  font-size: var(--t-sm);
+  padding: 8px 10px 2px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sg-card span { font-size: var(--t-xs); color: var(--ink-soft); padding: 0 10px 10px; margin-top: auto; }
+
 /* ── 하단: 에이전트 콘솔 ────────────────────── */
 .console { background: var(--brand-deep); color: #CBE3D6; }
 .console .c-head {
