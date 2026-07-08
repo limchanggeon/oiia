@@ -9,6 +9,7 @@
 예약은 결제 전 상태로만 생성한다(기한 내 미결제 시 코레일이 자동 취소).
 결제는 항상 사용자가 코레일톡/웹에서 직접 — 서비스 원칙과 동일.
 """
+import contextlib
 import json
 import os
 import sys
@@ -29,27 +30,34 @@ def public_attrs(obj):
 
 def main():
     mode = sys.argv[1]
-    korail = Korail(os.environ["KORAIL_ID"], os.environ["KORAIL_PW"], want_feedback=False)
+    result = None
 
-    if mode == "reserve":
-        dep, arr, date, train_no, time = sys.argv[2:7]
-        trains = korail.search_train(dep, arr, date, time, train_type=TrainType.ALL)
-        target = next((t for t in trains if t.train_no.lstrip("0") == train_no.lstrip("0")), None)
-        if target is None:
-            raise RuntimeError(f"{date} {time} 이후에서 열차 {train_no}를 찾지 못함")
-        rsv = korail.reserve(target)
-        json.dump({"ok": True, "reservation": public_attrs(rsv)}, sys.stdout, ensure_ascii=False)
+    # korail2 내부의 무조건 print(예: reserve() 첫 줄의 print(train))가 stdout의
+    # JSON을 오염시키지 않도록, 라이브러리 호출 동안 stdout을 stderr로 돌린다
+    with contextlib.redirect_stdout(sys.stderr):
+        korail = Korail(os.environ["KORAIL_ID"], os.environ["KORAIL_PW"], want_feedback=False)
 
-    elif mode == "cancel":
-        rsv_id = sys.argv[2]
-        rsv = next((r for r in korail.reservations() if str(r.rsv_id) == rsv_id), None)
-        if rsv is None:
-            raise RuntimeError(f"예약 {rsv_id} 없음 (이미 취소되었을 수 있음)")
-        korail.cancel(rsv)
-        json.dump({"ok": True, "cancelled": rsv_id}, sys.stdout, ensure_ascii=False)
+        if mode == "reserve":
+            dep, arr, date, train_no, time = sys.argv[2:7]
+            trains = korail.search_train(dep, arr, date, time, train_type=TrainType.ALL)
+            target = next((t for t in trains if t.train_no.lstrip("0") == train_no.lstrip("0")), None)
+            if target is None:
+                raise RuntimeError(f"{date} {time} 이후에서 열차 {train_no}를 찾지 못함")
+            rsv = korail.reserve(target)
+            result = {"ok": True, "reservation": public_attrs(rsv)}
 
-    else:
-        raise RuntimeError(f"알 수 없는 모드: {mode}")
+        elif mode == "cancel":
+            rsv_id = sys.argv[2]
+            rsv = next((r for r in korail.reservations() if str(r.rsv_id) == rsv_id), None)
+            if rsv is None:
+                raise RuntimeError(f"예약 {rsv_id} 없음 (이미 취소되었을 수 있음)")
+            korail.cancel(rsv)
+            result = {"ok": True, "cancelled": rsv_id}
+
+        else:
+            raise RuntimeError(f"알 수 없는 모드: {mode}")
+
+    json.dump(result, sys.stdout, ensure_ascii=False)
 
 
 if __name__ == "__main__":

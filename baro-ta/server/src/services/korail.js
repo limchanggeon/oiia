@@ -48,7 +48,17 @@ function runBookingScript(args) {
       try {
         resolve(JSON.parse(stdout));
       } catch {
-        reject(new Error("korail_booking.py 출력 파싱 실패"));
+        // 라이브러리가 stdout에 디버그 출력을 섞는 경우 대비 — 마지막 JSON 라인 시도
+        const lastJson = stdout
+          .trim()
+          .split("\n")
+          .reverse()
+          .find((l) => l.trim().startsWith("{"));
+        try {
+          resolve(JSON.parse(lastJson));
+        } catch {
+          reject(new Error(`korail_booking.py 출력 파싱 실패: ${stdout.trim().slice(0, 120)}`));
+        }
       }
     });
   });
