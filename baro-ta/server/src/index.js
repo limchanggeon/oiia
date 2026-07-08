@@ -2,6 +2,13 @@ import express from "express";
 import cors from "cors";
 import apiRouter from "./routes/api.js";
 
+// server/.env 로드 (코레일 계정 등 서버 전용 비밀) — 없으면 조용히 넘어간다
+try {
+  process.loadEnvFile();
+} catch {
+  /* .env 없음 — 조회 전용 모드 */
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
