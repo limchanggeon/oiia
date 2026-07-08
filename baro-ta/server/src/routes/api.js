@@ -24,13 +24,17 @@ router.post("/nlu/parse", (req, res) => {
   });
 });
 
-// 경로 후보 검색 + AI 스코어링
-router.post("/routes/search", (req, res) => {
-  const { origin, dest, arriveBy } = req.body || {};
+// 경로 후보 검색 + AI 스코어링 (코레일 실시간 조회 → 실패 시 모의 데이터)
+router.post("/routes/search", async (req, res) => {
+  const { origin, dest, arriveBy, dateIso } = req.body || {};
   if (!origin || !dest || typeof arriveBy !== "number") {
     return res.status(400).json({ error: "origin, dest, arriveBy(분)가 필요합니다." });
   }
-  res.json(searchRoutes({ origin, dest, arriveBy }));
+  try {
+    res.json(await searchRoutes({ origin, dest, arriveBy, dateIso }));
+  } catch (e) {
+    res.status(500).json({ error: `경로 검색 실패: ${e.message}` });
+  }
 });
 
 // 취소표 좌석 조회 (클라이언트가 랜덤 주기로 호출)

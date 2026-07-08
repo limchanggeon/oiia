@@ -3,3 +3,5 @@ dist/
 .env
 .DS_Store
 *.log
+server/py/.venv/
+__pycache__/

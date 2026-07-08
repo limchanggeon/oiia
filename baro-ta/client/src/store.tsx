@@ -263,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const p = stateRef.current.params;
       if (!p.origin || !p.dest || !p.time) return;
       try {
-        const res = await api.searchRoutes(p.origin, p.dest, p.time.min);
+        const res = await api.searchRoutes(p.origin, p.dest, p.time.min, p.date?.iso);
         logAll(res.agent);
         dispatch({ type: "SET_ROUTES", routes: res.routes });
         dispatch({ type: "SET_PANEL", panel: "routes" });

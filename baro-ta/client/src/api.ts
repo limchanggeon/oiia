@@ -27,10 +27,10 @@ export const api = {
   parse: (text: string) =>
     request<ParseResponse>("/api/nlu/parse", { method: "POST", body: JSON.stringify({ text }) }),
 
-  searchRoutes: (origin: string, dest: string, arriveBy: number) =>
+  searchRoutes: (origin: string, dest: string, arriveBy: number, dateIso?: string) =>
     request<SearchResponse>("/api/routes/search", {
       method: "POST",
-      body: JSON.stringify({ origin, dest, arriveBy }),
+      body: JSON.stringify({ origin, dest, arriveBy, dateIso }),
     }),
 
   standbyCheck: (searchId: string) =>

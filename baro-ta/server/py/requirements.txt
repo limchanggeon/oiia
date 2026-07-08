@@ -1,0 +1,5 @@
+# 코레일 실시간 조회용 (k-skill ktx-booking이 쓰는 것과 동일한 스택)
+# 설치: python3.10+ -m venv server/py/.venv && server/py/.venv/bin/pip install -r server/py/requirements.txt
+# venv가 없으면 서버는 자동으로 모의 데이터로 폴백한다.
+korail2-ncard
+pycryptodome
