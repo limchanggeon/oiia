@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PY = path.resolve(__dirname, "../../py/.venv/bin/python");
 const SCRIPT = path.resolve(__dirname, "../../py/korail_search.py");
+const BOOKING_SCRIPT = path.resolve(__dirname, "../../py/korail_booking.py");
 
 // 한 번 실패하면 잠시 재시도하지 않는다 — 시연 중 검색마다 타임아웃을 기다리지 않도록
 let deadUntil = 0;
@@ -32,4 +33,31 @@ export function searchKorailTrains({ origin, dest, date, time }) {
       }
     });
   });
+}
+
+// ── 실제 예약/취소 (코레일 멤버십 계정 필요, server/.env) ──────────────
+
+export function korailCredsPresent() {
+  return Boolean(process.env.KORAIL_ID && process.env.KORAIL_PW);
+}
+
+function runBookingScript(args) {
+  return new Promise((resolve, reject) => {
+    execFile(PY, [BOOKING_SCRIPT, ...args], { timeout: 20000 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || err.message).trim().slice(0, 300)));
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error("korail_booking.py 출력 파싱 실패"));
+      }
+    });
+  });
+}
+
+export function reserveKorailTrain({ origin, dest, date, trainNo, depTime }) {
+  return runBookingScript(["reserve", origin, dest, date, trainNo, depTime]);
+}
+
+export function cancelKorailReservation(rsvId) {
+  return runBookingScript(["cancel", String(rsvId)]);
 }

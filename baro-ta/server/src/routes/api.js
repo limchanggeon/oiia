@@ -43,11 +43,15 @@ router.get("/standby/:searchId/check", (req, res) => {
   res.json(checkSeat(req.params.searchId));
 });
 
-// 자동 예매 시작 (결제 직전까지)
-router.post("/bookings", (req, res) => {
+// 자동 예매 시작 (결제 직전까지 — 계정 있으면 코레일 실예약)
+router.post("/bookings", async (req, res) => {
   const { route, params } = req.body || {};
   if (!route || !params) return res.status(400).json({ error: "route, params가 필요합니다." });
-  res.json(createBooking({ route, params }));
+  try {
+    res.json(await createBooking({ route, params }));
+  } catch (e) {
+    res.status(500).json({ error: `예매 시작 실패: ${e.message}` });
+  }
 });
 
 // 도착지 숙소·투어 추천 (마이리얼트립 공식 MCP, 조회 전용)
@@ -67,11 +71,15 @@ router.get("/travel/suggest", async (req, res) => {
   });
 });
 
-// 결제 확정 (사용자 제어 단계)
-router.post("/bookings/:id/pay", (req, res) => {
-  const result = payBooking(req.params.id);
-  if (!result) return res.status(404).json({ error: "예매를 찾을 수 없습니다." });
-  res.json(result);
+// 결제 확정 (사용자 제어 단계 — 데모 결제 시 실예약은 자동 취소)
+router.post("/bookings/:id/pay", async (req, res) => {
+  try {
+    const result = await payBooking(req.params.id);
+    if (!result) return res.status(404).json({ error: "예매를 찾을 수 없습니다." });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: `결제 처리 실패: ${e.message}` });
+  }
 });
 
 export default router;
