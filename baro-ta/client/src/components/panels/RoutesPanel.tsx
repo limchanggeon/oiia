@@ -1,5 +1,6 @@
 import { useApp } from "../../store";
 import { fmtTime, fmtWon } from "../../utils";
+import { RouteMap } from "../RouteMap";
 
 export function RoutesPanel() {
   const { state, actions } = useApp();
@@ -30,6 +31,8 @@ export function RoutesPanel() {
           <b>{params.time?.label} 까지</b>
         </div>
       </div>
+
+      <RouteMap origin={params.origin} dest={params.dest} />
 
       {routes.map((r, idx) => (
         <div className={`route-row${idx === 0 ? " best" : ""}`} key={r.id}>
