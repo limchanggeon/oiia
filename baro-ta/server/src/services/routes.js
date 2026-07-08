@@ -23,7 +23,10 @@ export async function searchRoutes({ origin, dest, arriveBy, dateIso }) {
       return mock;
     }
   }
-  return mockRoutes({ origin, dest, arriveBy });
+  // 최근 실패로 재시도 억제 중 — 상태가 보이지 않으면 디버깅이 어려우니 로그로 남긴다
+  const mock = mockRoutes({ origin, dest, arriveBy });
+  mock.agent.unshift({ tag: "KORAIL", msg: "최근 실시간 조회 실패 → 잠시 모의 데이터로 동작 (2분 후 자동 재시도)" });
+  return mock;
 }
 
 // 적합도: 희망 도착시각 대비 여유·소요시간 종합 (실데이터/모의 공용)
