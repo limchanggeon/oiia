@@ -26,11 +26,17 @@ baro-ta/
 │     ├─ api.ts             # 백엔드 API 클라이언트 (VITE_API_URL로 배포 주소 지정)
 │     ├─ components/        # TopBar · ChatRail · PhaseBar · TabBar · AgentConsole
 │     └─ components/panels/ # Welcome → Routes → Standby → Booking → Payment → Done
-└─ server/                  # Express (ESM)
-   └─ src/
-      ├─ routes/api.js      # REST 엔드포인트
-      └─ services/          # nlu · routes · standby · bookings
+├─ server/                  # Express (ESM) — 초기 프로토타입 백엔드
+│  └─ src/
+│     ├─ routes/api.js      # REST 엔드포인트
+│     └─ services/          # nlu · routes · standby · bookings
+└─ backend/                 # FastAPI 오케스트레이터 (본 구현 — backend/README.md 참고)
+   └─ app/                  # LLM(rule/Claude/Ollama) · SQLite(WAL) · SSE · 승인 게이트 · k-skill 어댑터
 ```
+
+Express와 FastAPI는 **같은 REST 계약**을 구현한다 — 클라이언트는 `VITE_API_URL`로
+어느 쪽이든 선택할 수 있다 (Express :4000, FastAPI :8000). 플로우차트 기준 목표 백엔드는
+FastAPI이며, 팀 통합 가이드(SSE·k-skill CLI 계약·LLM 스위칭)는 `backend/README.md`에 있다.
 
 ## API
 

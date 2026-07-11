@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바로타 — 말로 하는 기차·버스 예매</title>
+<style>
+  :root {
+    --brand: #0C5C46; --brand-deep: #073D2E; --brand-soft: #E1EEE7;
+    --accent: #F5A300; --accent-ink: #3D2A00;
+    --ink: #14211B; --ink-soft: #46564E;
+    --paper: #FFFFFF; --page: #F1F4EF; --line: #D5DCD3;
+    --danger: #C63B33; --ok: #178A4B;
+    --fs: 20px; /* 시니어 기본 글자 크기 (NFR-1) */
+  }
+  * { box-sizing: border-box; }
+  html { font-size: var(--fs); }
+  html.bigger { --fs: 24px; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 540px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+  header {
+    background: var(--brand); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  header .logo { font-size: 1.3rem; font-weight: 800; }
+  header .logo em { font-style: normal; color: #FFC94D; }
+  header .spacer { flex: 1; }
+  .hbtn {
+    font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer;
+    background: rgba(255,255,255,.16); color: #fff; border: none; border-radius: 10px; padding: 10px 14px;
+  }
+  .hbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+  main { flex: 1; padding: 20px 18px 40px; }
+  section.screen { display: none; }
+  section.screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { section.screen.active { animation: none; } }
+
+  h1 { font-size: 1.5rem; font-weight: 800; margin: 8px 0 6px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-soft); font-size: 0.9rem; margin: 0 0 20px; }
+
+  .card {
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px;
+    padding: 20px; margin-bottom: 14px;
+  }
+
+  /* 버튼 — 시니어: 크게, 확실하게 */
+  .btn {
+    display: block; width: 100%; font: inherit; cursor: pointer; text-align: center;
+    font-size: 1.1rem; font-weight: 800; padding: 18px; min-height: 64px;
+    border-radius: 16px; border: none; margin-bottom: 12px;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:active { background: var(--brand-deep); }
+  .btn-accent { background: var(--accent); color: var(--accent-ink); }
+  .btn-ghost { background: #fff; border: 2px solid var(--line); color: var(--ink-soft); }
+  .btn-danger-ghost { background: #fff; border: 2px solid #E7C2BF; color: var(--danger); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* 입력바 + 마이크 (FR-1) */
+  .inputbar { display: flex; gap: 10px; margin: 14px 0; }
+  .inputbar input {
+    flex: 1; font: inherit; font-size: 1rem; padding: 16px; min-width: 0;
+    border: 2px solid var(--line); border-radius: 16px; background: #fff;
+  }
+  .inputbar input:focus { outline: none; border-color: var(--brand); }
+  .micbtn, .sendbtn {
+    font: inherit; cursor: pointer; border: none; border-radius: 16px;
+    width: 64px; min-width: 64px; font-size: 1.5rem; display: grid; place-items: center;
+  }
+  .micbtn { background: #fff; border: 2px solid var(--brand); }
+  .micbtn.listening { background: var(--danger); border-color: var(--danger); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .6; } }
+  .sendbtn { background: var(--brand); color: #fff; font-size: 1rem; font-weight: 800; }
+
+  .samples { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    background: #fff; border: 2px solid var(--brand); color: var(--brand);
+    border-radius: 999px; padding: 12px 16px;
+  }
+
+  /* 홈 진행중 카드 (FR-15) */
+  .active-hold { border: 2.5px solid var(--accent); background: #FFF8E8; cursor: pointer; }
+  .active-hold b { font-size: 1.05rem; }
+  .active-hold .cnt { color: var(--danger); font-weight: 800; }
+
+  /* 질문 화면 (FR-3) */
+  .question { font-size: 1.4rem; font-weight: 800; margin: 20px 0 18px; text-wrap: balance; }
+  .ask-hint { color: var(--ink-soft); font-size: 0.85rem; margin-top: 16px; }
+
+  /* 확인 요약 (FR-4) */
+  .summary-line { font-size: 1.35rem; font-weight: 800; line-height: 1.6; margin: 10px 0 20px; }
+  .slot-rows { border-top: 1.5px dashed var(--line); margin-top: 10px; padding-top: 10px; }
+  .slot-rows div { display: flex; justify-content: space-between; padding: 6px 0; font-size: 1rem; }
+  .slot-rows span { color: var(--ink-soft); }
+  .slot-rows b { font-weight: 800; }
+
+  /* 경로 카드 (FR-9) */
+  .jcard { cursor: default; }
+  .jcard .modes { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .mode-tag { font-size: 0.8rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); border-radius: 8px; padding: 4px 10px; }
+  .mode-tag.bus { background: #EFE7F7; color: #5E35B1; }
+  .badge-re { font-size: 0.75rem; font-weight: 800; background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 4px 10px; }
+  .jtime { display: flex; align-items: baseline; gap: 12px; }
+  .jtime .dep { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; }
+  .jtime .arr { font-size: 1.1rem; color: var(--ink-soft); }
+  .jmeta { display: flex; gap: 14px; color: var(--ink-soft); font-size: 0.95rem; margin: 6px 0 8px; flex-wrap: wrap; }
+  .jmeta b { color: var(--ink); }
+  .jexplain { background: var(--brand-soft); color: var(--brand-deep); border-radius: 12px; padding: 10px 14px; font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
+  .notice-warn { background: #FDF2E3; border: 1.5px solid #F0D5A8; color: #7A5200; border-radius: 14px; padding: 14px 16px; font-size: 0.9rem; margin-bottom: 14px; }
+
+  /* 선점 (FR-10) */
+  .big-ok { font-size: 3rem; text-align: center; margin: 10px 0 0; }
+  .hold-title { text-align: center; font-size: 1.5rem; font-weight: 800; margin: 6px 0 16px; }
+  .notices li { margin-bottom: 10px; font-size: 1.02rem; }
+  .countdown { text-align: center; font-size: 2.2rem; font-weight: 800; color: var(--danger); font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+  .countdown-label { text-align: center; color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 14px; }
+  .kv { display: flex; justify-content: space-between; padding: 6px 0; font-size: 1rem; }
+  .kv span { color: var(--ink-soft); }
+  .kv b { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* 탑승 안내 (FR-13) */
+  .reminder { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1.5px dashed var(--line); }
+  .reminder:last-child { border-bottom: none; }
+  .reminder .when { min-width: 7.5em; font-weight: 800; font-size: 0.9rem; color: var(--brand); }
+  .reminder .msg { font-size: 0.95rem; }
+
+  /* 시연 설정 */
+  details.sim { margin-top: 26px; color: var(--ink-soft); font-size: 0.8rem; }
+  details.sim label { display: block; padding: 6px 0; }
+  details.sim input { width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
+
+  /* 개발 로그 */
+  #devlog { background: var(--brand-deep); color: #BFE0CF; font: 11px/1.7 ui-monospace, Menlo, monospace;
+    max-height: 140px; overflow-y: auto; padding: 8px 16px; display: none; white-space: pre-wrap; }
+  #devlog.open { display: block; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 14px 22px; border-radius: 14px;
+    font-size: 0.95rem; opacity: 0; pointer-events: none; transition: opacity .3s; max-width: 90%;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">바로<em>타</em></div>
+    <div class="spacer"></div>
+    <button class="hbtn" id="btnBigger" aria-pressed="false">가 글씨 크게</button>
+    <button class="hbtn" id="btnHome">처음으로</button>
+    <button class="hbtn" id="btnLog">로그</button>
+  </header>
+
+  <main>
+    <!-- 홈: FR-1 입력 + FR-15 진행중 카드 -->
+    <section class="screen active" id="scr-home">
+      <div id="homeHoldCard"></div>
+      <h1>어디 가고 싶으세요?</h1>
+      <p class="sub">말하듯 편하게 이야기해 주세요. 마이크를 누르고 말씀하셔도 돼요.</p>
+      <div class="inputbar">
+        <input id="txt" type="text" placeholder="예: 내일 아침에 부산 가려고" aria-label="여정 입력">
+        <button class="micbtn" id="mic" title="음성으로 말하기">🎤</button>
+        <button class="sendbtn" id="send">보내기</button>
+      </div>
+      <div class="samples">
+        <button class="chip" data-say="내일 아침에 서울에서 부산 가려고, 어른 두 명">내일 아침 서울에서 부산, 두 명</button>
+        <button class="chip" data-say="설 전날 대전에서 부산 내려가려고">설 전날 대전에서 부산</button>
+        <button class="chip" data-say="부산 한번 가보고 싶네">부산 가보고 싶네 (되묻기 보기)</button>
+      </div>
+      <details class="sim">
+        <summary>시연 설정 (개발용)</summary>
+        <label><input type="checkbox" id="simSoldOut"> 전 좌석 매진 (대체 여정 재조합 보기)</label>
+        <label><input type="checkbox" id="simFailSrt"> SRT 조회 장애 (일부 수단 제외 고지 보기)</label>
+        <label><input type="checkbox" id="simConflict"> 선점 경합 매진 (자리 뺏김 보기)</label>
+      </details>
+    </section>
+
+    <!-- 되묻기: FR-3 -->
+    <section class="screen" id="scr-ask">
+      <div class="question" id="askQ"></div>
+      <div id="askOpts"></div>
+      <div class="inputbar">
+        <input id="txtAsk" type="text" placeholder="직접 말씀하셔도 돼요" aria-label="직접 입력">
+        <button class="micbtn" id="micAsk">🎤</button>
+        <button class="sendbtn" id="sendAsk">보내기</button>
+      </div>
+      <div class="ask-hint" id="askHint"></div>
+      <button class="btn btn-ghost" id="askReset">처음부터 다시 할게요</button>
+    </section>
+
+    <!-- 확인 요약: FR-4 -->
+    <section class="screen" id="scr-confirm">
+      <h1>이렇게 찾아볼까요?</h1>
+      <div class="card">
+        <div class="summary-line" id="confirmSummary"></div>
+        <div class="slot-rows" id="confirmRows"></div>
+      </div>
+      <button class="btn btn-primary" id="btnYes">네, 맞아요</button>
+      <button class="btn btn-ghost" id="btnFix">고칠게요</button>
+      <div id="fixPanel" style="display:none">
+        <div class="card">
+          <b>무엇을 고칠까요?</b>
+          <div class="samples" style="margin-top:12px" id="fixChips"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 경로 제시: FR-9 -->
+    <section class="screen" id="scr-results">
+      <h1 id="resultsTitle">표를 찾고 있어요…</h1>
+      <p class="sub" id="resultsSub"></p>
+      <div id="resultsNotice"></div>
+      <div id="resultsList"></div>
+      <button class="btn btn-ghost" id="btnResultsBack">조건을 바꿀래요</button>
+    </section>
+
+    <!-- 좌석 선점: FR-10 -->
+    <section class="screen" id="scr-hold">
+      <div class="big-ok">✅</div>
+      <div class="hold-title">자리를 잡아뒀어요</div>
+      <div class="card">
+        <div class="countdown" id="holdCount">--:--</div>
+        <div class="countdown-label">이 시간 안에 결제하면 돼요</div>
+        <ul class="notices" id="holdNotices"></ul>
+        <div class="slot-rows" id="holdInfo"></div>
+      </div>
+      <div id="holdBusNotice"></div>
+      <button class="btn btn-accent" id="btnGoPay">결제하러 가기</button>
+      <button class="btn btn-danger-ghost" id="btnCancelHold">이 표는 취소할게요</button>
+    </section>
+
+    <!-- 결제: FR-11 (결제 자동화 금지 — 안내만) -->
+    <section class="screen" id="scr-pay">
+      <h1>결제는 직접 해주세요</h1>
+      <p class="sub">이 앱은 카드 번호를 묻지 않아요. 결제는 코레일 앱·역 창구에서 어르신이 직접 하세요.</p>
+      <div class="card">
+        <div class="kv"><span>예약번호</span><b id="payReserveNo">-</b></div>
+        <div class="kv"><span>결제할 금액</span><b id="payFare">-</b></div>
+        <div class="kv"><span>남은 시간</span><b id="payCount">-</b></div>
+      </div>
+      <button class="btn btn-primary" id="btnPaid">결제를 마쳤어요</button>
+      <button class="btn btn-ghost" id="btnPayBack">아직이에요, 돌아갈게요</button>
+    </section>
+
+    <!-- 완료 + 탑승 안내: FR-13 -->
+    <section class="screen" id="scr-done">
+      <div class="big-ok">🎫</div>
+      <div class="hold-title">예매가 끝났어요</div>
+      <div class="card">
+        <div class="slot-rows" id="doneInfo"></div>
+      </div>
+      <div class="card">
+        <b>이때 알려드릴게요</b>
+        <p class="sub" style="margin:6px 0 10px">전날 저녁과 당일 아침에 알려드릴게요.</p>
+        <div id="doneReminders"></div>
+      </div>
+      <button class="btn btn-primary" id="btnDoneHome">처음으로</button>
+    </section>
+  </main>
+
+  <div id="devlog"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const SID = localStorage.getItem("barota-sid") ||
+  (() => { const s = "s_" + Math.random().toString(36).slice(2, 10); localStorage.setItem("barota-sid", s); return s; })();
+const DEMO = new URLSearchParams(location.search).has("demo");
+
+let lastSlots = null;
+let currentHold = null;
+let countTimer = null;
+
+/* ── 공통 ─────────────────────────────── */
+function show(id) {
+  document.querySelectorAll("section.screen").forEach((s) => s.classList.remove("active"));
+  $("#scr-" + id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3200);
+}
+async function api(path, opts) {
+  const res = await fetch("/api/v2" + path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.detail || "연결이 어려워요");
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+function sim() {
+  return {
+    soldOutAll: $("#simSoldOut").checked,
+    failSources: $("#simFailSrt").checked ? ["SRT"] : [],
+    holdConflict: $("#simConflict").checked,
+  };
+}
+const fmt = (m) => `${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const won = (n) => n.toLocaleString("ko-KR") + "원";
+
+/* ── FR-2/3/4: 대화 ─────────────────────── */
+async function sendText(text) {
+  text = (text || "").trim();
+  if (!text) return;
+  try {
+    const r = await api("/dialog/turn", { method: "POST", body: JSON.stringify({ sessionId: SID, text }) });
+    lastSlots = r.slots;
+    if (r.next.type === "ask") renderAsk(r);
+    else renderConfirm(r);
+  } catch (e) {
+    toast("지금은 연결이 어려워요. 잠시 후 다시 해주세요.");
+  }
+}
+
+function renderAsk(r) {
+  $("#askQ").textContent = r.next.question;
+  const box = $("#askOpts");
+  box.innerHTML = "";
+  r.next.options.forEach((o) => {
+    const b = document.createElement("button");
+    b.className = "btn btn-primary";
+    b.textContent = o.label;
+    b.onclick = () => sendText(o.slot_value);
+    box.appendChild(b);
+  });
+  $("#askHint").textContent = r.askCount >= 3 ? "여러 번 여쭤봐서 죄송해요. 아래에서 처음부터 다시 하셔도 돼요." : "";
+  show("ask");
+}
+
+function renderConfirm(r) {
+  $("#confirmSummary").textContent = r.next.summary;
+  const s = r.slots;
+  $("#confirmRows").innerHTML = `
+    <div><span>가는 날</span><b>${s.date.md} (${s.date.label})</b></div>
+    <div><span>가는 길</span><b>${s.departure} → ${s.arrival}</b></div>
+    <div><span>시간대</span><b>${s.timeOfDay}</b></div>
+    <div><span>인원</span><b>어른 ${s.passengers}명</b></div>`;
+  $("#fixPanel").style.display = "none";
+  show("confirm");
+  if (DEMO) setTimeout(() => $("#btnYes").click(), 1500);
+}
+
+const FIX_CHIPS = [
+  ["서울에서 출발", "대전에서 출발", "동대구에서 출발"],
+  ["부산까지", "강릉까지", "대전까지"],
+  ["오늘", "내일", "모레"],
+  ["혼자", "두 명", "세 명"],
+];
+$("#btnFix").onclick = () => {
+  const panel = $("#fixPanel");
+  panel.style.display = "block";
+  const box = $("#fixChips");
+  box.innerHTML = "";
+  FIX_CHIPS.flat().forEach((v) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = v;
+    b.onclick = () => sendText(v);
+    box.appendChild(b);
+  });
+};
+
+/* ── FR-6/7/8/9: 검색·경로 카드 ───────────── */
+$("#btnYes").onclick = search;
+async function search() {
+  $("#resultsTitle").textContent = "표를 찾고 있어요…";
+  $("#resultsSub").textContent = "기차와 버스를 한꺼번에 알아보고 있어요.";
+  $("#resultsNotice").innerHTML = "";
+  $("#resultsList").innerHTML = "";
+  show("results");
+  try {
+    const r = await api("/journeys/search", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: SID, sim: { ...sim(), holdConflict: false } }),
+    });
+    renderResults(r);
+  } catch (e) {
+    $("#resultsTitle").textContent = "표를 찾지 못했어요";
+    $("#resultsSub").textContent = e.message;
+  }
+}
+
+function renderResults(r) {
+  $("#resultsTitle").textContent = r.recombined ? "갈아타는 길을 찾았어요" : "탈 수 있는 표예요";
+  $("#resultsSub").textContent = r.recombined
+    ? "바로 가는 차는 모두 매진이라, 갈아타는 길을 대신 찾았어요."
+    : "매진된 차는 빼고 보여드려요.";
+  const notice = $("#resultsNotice");
+  if (r.excludedSources.length) {
+    notice.innerHTML = `<div class="notice-warn">일부 교통편(${r.excludedSources.join(", ")})은 확인하지 못했어요.
+      <button class="chip" style="margin-top:8px" onclick="search()">다시 확인해보기</button></div>`;
+  }
+  const list = $("#resultsList");
+  list.innerHTML = "";
+  if (!r.journeys.length) {
+    list.innerHTML = `<div class="card">지금 조건으로는 표가 없어요. 시간대나 날짜를 바꿔보세요.</div>`;
+    return;
+  }
+  r.journeys.forEach((j, idx) => {
+    const modes = j.legs.map((l) =>
+      `<span class="mode-tag ${l.mode.includes("버스") ? "bus" : ""}">${l.mode}</span>`).join("");
+    const transfer = j.transfers === 0
+      ? "갈아타지 않아요"
+      : `${j.legs[0].to}에서 1번 갈아타요 (${j.transferWaitMin}분 기다려요)`;
+    const card = document.createElement("div");
+    card.className = "card jcard";
+    card.innerHTML = `
+      <div class="modes">${modes}${r.recombined ? '<span class="badge-re">대체 경로</span>' : ""}</div>
+      <div class="jtime"><span class="dep">${fmt(j.dep)}</span><span class="arr">→ ${fmt(j.arr)} 도착</span></div>
+      <div class="jmeta"><span><b>${won(j.totalFare)}</b></span><span>${Math.floor(j.durationMin / 60)}시간 ${j.durationMin % 60}분</span><span>${transfer}</span></div>
+      ${j.explain ? `<div class="jexplain">💬 ${j.explain}</div>` : ""}
+      <button class="btn ${idx === 0 ? "btn-primary" : "btn-ghost"}" style="margin-bottom:0">이 차로 할게요</button>`;
+    card.querySelector("button").onclick = () => hold(j);
+    list.appendChild(card);
+  });
+  if (DEMO) setTimeout(() => { const b = list.querySelector("button"); if (b) b.click(); }, 1800);
+}
+$("#btnResultsBack").onclick = () => show("confirm");
+
+/* ── FR-10: 좌석 선점 ─────────────────────── */
+async function hold(journey) {
+  try {
+    const h = await api("/holds", {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId: SID,
+        journey,
+        passengers: (lastSlots && lastSlots.passengers) || 1,
+        dateIso: lastSlots && lastSlots.date ? lastSlots.date.iso : null,
+        sim: { soldOutAll: false, failSources: [], holdConflict: sim().holdConflict },
+      }),
+    });
+    currentHold = h;
+    renderHold(h);
+  } catch (e) {
+    if (e.status === 409) {
+      // FR-10 예외: 경합 매진 → 동의 후 재조합 (FR-8)
+      if (confirm("방금 자리가 나갔어요.\n다른 길을 찾아볼까요?")) {
+        $("#simConflict").checked = false;
+        $("#simSoldOut").checked = true; // 재조합 흐름 시연
+        search();
+      }
+    } else {
+      toast(e.message);
+    }
+  }
+}
+
+function startCountdown(get, el, onExpire) {
+  clearInterval(countTimer);
+  const tick = () => {
+    const s = get();
+    if (s <= 0) { el.textContent = "00:00"; clearInterval(countTimer); if (onExpire) onExpire(); return; }
+    el.textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  };
+  tick();
+  countTimer = setInterval(tick, 1000);
+}
+
+function renderHold(h) {
+  const deadline = Date.now() + h.remainingSec * 1000;
+  startCountdown(
+    () => Math.max(0, Math.round((deadline - Date.now()) / 1000)),
+    $("#holdCount"),
+    () => { toast("결제 시간이 지나 자동으로 취소됐어요. 돈은 나가지 않았어요."); goHome(); }
+  );
+  $("#holdNotices").innerHTML = h.notices.map((n) => `<li>${n}</li>`).join("");
+  const j = h.journey;
+  $("#holdInfo").innerHTML = `
+    <div><span>가는 길</span><b>${j.legs[0]["from"]} → ${j.legs[j.legs.length - 1].to}</b></div>
+    <div><span>출발</span><b>${fmt(j.dep)}</b></div>
+    <div><span>예약번호</span><b>${h.reserveNo || "없음(버스)"}</b></div>
+    <div><span>금액</span><b>${won(h.fare)}</b></div>`;
+  $("#holdBusNotice").innerHTML = h.unreservableLegs.length
+    ? `<div class="notice-warn">${h.unreservableLegs[0].notice}</div>` : "";
+  show("hold");
+}
+
+$("#btnGoPay").onclick = () => {
+  if (!currentHold) return;
+  $("#payReserveNo").textContent = currentHold.reserveNo || "없음(버스)";
+  $("#payFare").textContent = won(currentHold.fare);
+  const deadline = Date.now() + Math.max(0, currentHold.remainingSec * 1000);
+  startCountdown(() => Math.max(0, Math.round((deadline - Date.now()) / 1000)), $("#payCount"));
+  show("pay");
+};
+$("#btnPayBack").onclick = () => renderHold(currentHold);
+$("#btnCancelHold").onclick = async () => {
+  if (!currentHold) return;
+  if (!confirm("이 표를 취소할까요? 돈은 나가지 않았어요.")) return;
+  try {
+    await api(`/holds/${currentHold.holdId}/cancel`, { method: "POST", body: "{}" });
+    toast("취소했어요. 돈은 한 푼도 나가지 않았어요.");
+    goHome();
+  } catch (e) { toast(e.message); }
+};
+
+/* ── FR-11/13: 결제 확인 → 탑승 안내 ───────── */
+$("#btnPaid").onclick = async () => {
+  if (!currentHold) return;
+  try {
+    const h = await api(`/holds/${currentHold.holdId}/pay-confirmed`, { method: "POST", body: "{}" });
+    currentHold = h;
+    renderDone(h);
+  } catch (e) { toast(e.message); }
+};
+
+function renderDone(h) {
+  clearInterval(countTimer);
+  const j = h.journey;
+  $("#doneInfo").innerHTML = `
+    <div><span>가는 날</span><b>${h.dateIso || "-"}</b></div>
+    <div><span>가는 길</span><b>${j.legs[0]["from"]} → ${j.legs[j.legs.length - 1].to}</b></div>
+    <div><span>출발 시각</span><b>${fmt(j.dep)}</b></div>
+    <div><span>예약번호</span><b>${h.reserveNo || "-"}</b></div>
+    <div><span>낸 금액</span><b>${won(h.fare)}</b></div>`;
+  $("#doneReminders").innerHTML = h.reminders.length
+    ? h.reminders.map((r) => `<div class="reminder"><div class="when">${r.label}</div><div class="msg">${r.message}</div></div>`).join("")
+    : `<div class="reminder"><div class="msg">여행 날짜 정보가 없어 알림을 만들지 못했어요.</div></div>`;
+  show("done");
+}
+$("#btnDoneHome").onclick = goHome;
+
+/* ── FR-15: 내 예매 확인 ──────────────────── */
+async function refreshHomeCard() {
+  const box = $("#homeHoldCard");
+  box.innerHTML = "";
+  try {
+    const r = await api(`/holds?sessionId=${SID}`);
+    const held = r.holds.find((h) => h.status === "held");
+    const paid = r.holds.find((h) => h.status === "paid");
+    if (held) {
+      const mins = Math.max(1, Math.floor(held.remainingSec / 60));
+      box.innerHTML = `<div class="card active-hold"><b>💳 결제를 기다리는 표가 있어요</b><br>
+        <span class="cnt">${mins}분 남았어요</span> — 눌러서 확인하세요</div>`;
+      box.querySelector(".active-hold").onclick = () => { currentHold = held; renderHold(held); };
+    } else if (paid) {
+      box.innerHTML = `<div class="card active-hold"><b>🎫 다가오는 여행이 있어요</b><br>
+        ${paid.journey.legs[0]["from"]} → ${paid.journey.legs[paid.journey.legs.length - 1].to} — 눌러서 확인하세요</div>`;
+      box.querySelector(".active-hold").onclick = () => { currentHold = paid; renderDone(paid); };
+    }
+  } catch (e) { /* 홈 카드는 조용히 생략 */ }
+}
+
+function goHome() {
+  clearInterval(countTimer);
+  refreshHomeCard();
+  show("home");
+}
+
+/* ── FR-1: 음성 입력 (Web Speech API) ─────── */
+function setupMic(btnId, inputId) {
+  const btn = $(btnId);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { btn.style.display = "none"; return; }
+  const rec = new SR();
+  rec.lang = "ko-KR";
+  rec.interimResults = false;
+  let listening = false;
+  rec.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    $(inputId).value = text;
+    sendText(text);
+  };
+  rec.onend = () => { listening = false; btn.classList.remove("listening"); };
+  rec.onerror = () => toast("잘 못 들었어요. 다시 한 번 말씀해 주세요.");
+  btn.onclick = () => {
+    if (listening) { rec.stop(); return; }
+    listening = true;
+    btn.classList.add("listening");
+    rec.start();
+    toast("듣고 있어요. 말씀하세요.");
+  };
+}
+
+/* ── 개발 로그 (SSE) — 패널을 열 때만 연결한다 ── */
+(function devlog() {
+  const box = $("#devlog");
+  let es = null;
+  $("#btnLog").onclick = () => {
+    const open = box.classList.toggle("open");
+    if (open && !es) {
+      es = new EventSource(`/api/stream/${SID}`);
+      es.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+        box.textContent += `[${ev.tag}] ${ev.msg}\n`;
+        box.scrollTop = box.scrollHeight;
+      };
+    } else if (!open && es) {
+      es.close();
+      es = null;
+    }
+  };
+})();
+
+/* ── 바인딩 ───────────────────────────────── */
+$("#send").onclick = () => { sendText($("#txt").value); $("#txt").value = ""; };
+$("#txt").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#send").click(); });
+$("#sendAsk").onclick = () => { sendText($("#txtAsk").value); $("#txtAsk").value = ""; };
+$("#txtAsk").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#sendAsk").click(); });
+document.querySelectorAll(".chip[data-say]").forEach((c) => (c.onclick = () => sendText(c.dataset.say)));
+$("#btnHome").onclick = goHome;
+$("#askReset").onclick = async () => {
+  try { await api(`/dialog/${SID}/reset`, { method: "POST", body: "{}" }); } catch (e) {}
+  lastSlots = null;
+  goHome();
+};
+$("#btnBigger").onclick = () => {
+  const on = document.documentElement.classList.toggle("bigger");
+  $("#btnBigger").setAttribute("aria-pressed", String(on));
+};
+setupMic("#mic", "#txt");
+setupMic("#micAsk", "#txtAsk");
+
+refreshHomeCard();
+// 시연용: ?demo 는 기본 시나리오 자동 재생, ?say=<문장> 은 임의 발화로 시작
+const SAY = new URLSearchParams(location.search).get("say");
+if (SAY) setTimeout(() => sendText(SAY), 500);
+else if (DEMO) setTimeout(() => sendText("내일 아침에 서울에서 부산 가려고, 어른 두 명"), 700);
+</script>
+</body>
+</html>

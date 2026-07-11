@@ -5,3 +5,10 @@ dist/
 *.log
 server/py/.venv/
 __pycache__/
+
+# FastAPI 백엔드
+.venv/
+backend/.venv/
+*.db
+*.db-wal
+*.db-shm

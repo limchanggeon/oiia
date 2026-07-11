@@ -1,0 +1,29 @@
+# 데모 서버 — Docker Compose (Ubuntu / Apple Silicon)
+# 실행: docker compose up --build
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      BAROTA_DB: /data/barota.db
+    volumes:
+      - barota-data:/data
+
+  # ── 팀원 통합 자리 ─────────────────────────────
+  # frontend:   # Next.js 담당 — 포트 3000, NEXT_PUBLIC_API_URL=http://backend:8000
+  #   build: ./frontend
+  #   ports: ["3000:3000"]
+  #   depends_on: [backend]
+  #
+  # ollama:     # 로컬 LLM 사용 시 — backend의 OLLAMA_BASE_URL=http://ollama:11434
+  #   image: ollama/ollama
+  #   ports: ["11434:11434"]
+  #   volumes: [ollama-models:/root/.ollama]
+
+volumes:
+  barota-data:
+  # ollama-models:
