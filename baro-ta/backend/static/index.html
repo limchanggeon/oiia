@@ -72,10 +72,11 @@
   .inputbar input:focus { outline: none; border-color: var(--brand); }
   .micbtn, .sendbtn {
     font: inherit; cursor: pointer; border: none; border-radius: 16px;
-    width: 64px; min-width: 64px; font-size: 1.5rem; display: grid; place-items: center;
+    width: 64px; min-width: 64px; display: grid; place-items: center;
   }
-  .micbtn { background: #fff; border: 2px solid var(--brand); }
-  .micbtn.listening { background: var(--danger); border-color: var(--danger); animation: pulse 1s infinite; }
+  .micbtn { background: #fff; border: 2px solid var(--brand); color: var(--brand); }
+  .micbtn svg { width: 28px; height: 28px; }
+  .micbtn.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1s infinite; }
   @keyframes pulse { 50% { opacity: .6; } }
   .sendbtn { background: var(--brand); color: #fff; font-size: 1rem; font-weight: 800; }
 
@@ -117,7 +118,8 @@
   .notice-warn { background: #FDF2E3; border: 1.5px solid #F0D5A8; color: #7A5200; border-radius: 14px; padding: 14px 16px; font-size: 0.9rem; margin-bottom: 14px; }
 
   /* 선점 (FR-10) */
-  .big-ok { font-size: 3rem; text-align: center; margin: 10px 0 0; }
+  .big-ok { display: flex; justify-content: center; margin: 18px 0 0; color: var(--ok); }
+  .big-ok svg { width: 76px; height: 76px; }
   .hold-title { text-align: center; font-size: 1.5rem; font-weight: 800; margin: 6px 0 16px; }
   .notices li { margin-bottom: 10px; font-size: 1.02rem; }
   .countdown { text-align: center; font-size: 2.2rem; font-weight: 800; color: var(--danger); font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
@@ -168,7 +170,7 @@
       <p class="sub">말하듯 편하게 이야기해 주세요. 마이크를 누르고 말씀하셔도 돼요.</p>
       <div class="inputbar">
         <input id="txt" type="text" placeholder="예: 내일 아침에 부산 가려고" aria-label="여정 입력">
-        <button class="micbtn" id="mic" title="음성으로 말하기">🎤</button>
+        <button class="micbtn" id="mic" title="음성으로 말하기" aria-label="음성으로 말하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
         <button class="sendbtn" id="send">보내기</button>
       </div>
       <div class="samples">
@@ -190,7 +192,7 @@
       <div id="askOpts"></div>
       <div class="inputbar">
         <input id="txtAsk" type="text" placeholder="직접 말씀하셔도 돼요" aria-label="직접 입력">
-        <button class="micbtn" id="micAsk">🎤</button>
+        <button class="micbtn" id="micAsk" title="음성으로 말하기" aria-label="음성으로 말하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
         <button class="sendbtn" id="sendAsk">보내기</button>
       </div>
       <div class="ask-hint" id="askHint"></div>
@@ -225,7 +227,7 @@
 
     <!-- 좌석 선점: FR-10 -->
     <section class="screen" id="scr-hold">
-      <div class="big-ok">✅</div>
+      <div class="big-ok" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-6"/></svg></div>
       <div class="hold-title">자리를 잡아뒀어요</div>
       <div class="card">
         <div class="countdown" id="holdCount">--:--</div>
@@ -253,7 +255,7 @@
 
     <!-- 완료 + 탑승 안내: FR-13 -->
     <section class="screen" id="scr-done">
-      <div class="big-ok">🎫</div>
+      <div class="big-ok" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></svg></div>
       <div class="hold-title">예매가 끝났어요</div>
       <div class="card">
         <div class="slot-rows" id="doneInfo"></div>
@@ -427,7 +429,7 @@ function renderResults(r) {
       <div class="modes">${modes}${r.recombined ? '<span class="badge-re">대체 경로</span>' : ""}</div>
       <div class="jtime"><span class="dep">${fmt(j.dep)}</span><span class="arr">→ ${fmt(j.arr)} 도착</span></div>
       <div class="jmeta"><span><b>${won(j.totalFare)}</b></span><span>${Math.floor(j.durationMin / 60)}시간 ${j.durationMin % 60}분</span><span>${transfer}</span></div>
-      ${j.explain ? `<div class="jexplain">💬 ${j.explain}</div>` : ""}
+      ${j.explain ? `<div class="jexplain">${j.explain}</div>` : ""}
       <button class="btn ${idx === 0 ? "btn-primary" : "btn-ghost"}" style="margin-bottom:0">이 차로 할게요</button>`;
     card.querySelector("button").onclick = () => hold(j);
     list.appendChild(card);
@@ -550,11 +552,11 @@ async function refreshHomeCard() {
     const paid = r.holds.find((h) => h.status === "paid");
     if (held) {
       const mins = Math.max(1, Math.floor(held.remainingSec / 60));
-      box.innerHTML = `<div class="card active-hold"><b>💳 결제를 기다리는 표가 있어요</b><br>
+      box.innerHTML = `<div class="card active-hold"><b>결제를 기다리는 표가 있어요</b><br>
         <span class="cnt">${mins}분 남았어요</span> — 눌러서 확인하세요</div>`;
       box.querySelector(".active-hold").onclick = () => { currentHold = held; renderHold(held); };
     } else if (paid) {
-      box.innerHTML = `<div class="card active-hold"><b>🎫 다가오는 여행이 있어요</b><br>
+      box.innerHTML = `<div class="card active-hold"><b>다가오는 여행이 있어요</b><br>
         ${paid.journey.legs[0]["from"]} → ${paid.journey.legs[paid.journey.legs.length - 1].to} — 눌러서 확인하세요</div>`;
       box.querySelector(".active-hold").onclick = () => { currentHold = paid; renderDone(paid); };
     }
