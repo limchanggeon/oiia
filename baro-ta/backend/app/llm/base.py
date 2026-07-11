@@ -11,6 +11,30 @@ LLM 파서(anthropic/ollama)는 중간 형식
 import datetime as dt
 from typing import Any, Dict, Optional
 
+from ..config import settings
+
+
+def build_output_config(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """structured outputs 설정 — effort는 지원 모델에서만 붙인다.
+
+    Haiku 4.5는 effort 파라미터를 받지 않는다(400). Opus/Sonnet 계열은
+    단순 추출 작업이므로 low로 지연·비용을 줄인다.
+    """
+    cfg: Dict[str, Any] = {"format": {"type": "json_schema", "schema": schema}}
+    if not settings.llm_model.startswith("claude-haiku"):
+        cfg["effort"] = "low"
+    return cfg
+
+
+def date_context(today: dt.date) -> str:
+    """상대 날짜 근거 주입 — LLM이 '다음 주'를 한 주 뒤로 미는 오류 방지 (주=월요일 시작)."""
+    monday = today - dt.timedelta(days=today.weekday())
+    def rng(offset: int) -> str:
+        s = monday + dt.timedelta(days=7 * offset)
+        return f"{s.isoformat()}~{(s + dt.timedelta(days=6)).isoformat()}"
+    return f"주 기준(월요일 시작): 이번 주 {rng(0)}, 다음 주 {rng(1)}, 다다음 주 {rng(2)}"
+
+
 STATIONS = [
     "서울", "용산", "수서", "대전", "동대구", "부산", "광주송정", "목포",
     "오송", "천안아산", "익산", "전주", "강릉", "포항", "울산", "여수",

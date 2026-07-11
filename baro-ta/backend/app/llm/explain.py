@@ -6,6 +6,7 @@ import json
 from typing import Any, Dict, List
 
 from ..config import settings
+from .base import build_output_config
 
 EXPLAIN_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -51,10 +52,7 @@ async def explain_anthropic(journeys: List[Dict[str, Any]]) -> List[str]:
         model=settings.llm_model,
         max_tokens=1024,
         system=EXPLAIN_SYSTEM_PROMPT,
-        output_config={
-            "format": {"type": "json_schema", "schema": EXPLAIN_SCHEMA},
-            "effort": "low",
-        },
+        output_config=build_output_config(EXPLAIN_SCHEMA),
         messages=[{"role": "user", "content": json.dumps(brief, ensure_ascii=False)}],
     )
     raw_text = next(b.text for b in response.content if b.type == "text")

@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from ..config import settings
-from .base import STATIONS, build_date
+from .base import STATIONS, build_date, build_output_config, date_context
 from .holidays import upcoming
 
 _NULLABLE_STR = {"anyOf": [{"type": "string"}, {"type": "null"}]}
@@ -69,7 +69,8 @@ DIALOG_SYSTEM_PROMPT = (
     "[되묻기 규칙 — 빈 필수 슬롯이 있을 때만]\n"
     "1. 한 번에 하나만 묻습니다 (question 1개, target_slot 1개).\n"
     "2. 열린 질문 금지 — 반드시 선택지 2~3개(options)를 함께 만듭니다.\n"
-    "3. 버튼 라벨(label)은 명사형/명령형 — 예: '아침 출발' ○ / '아침에 출발하시겠어요?' ×.\n"
+    "3. 버튼 라벨(label)은 명사형/명령형 — 예: '아침 출발' ○, '서울 출발' ○, '부산 도착' ○ / "
+    "'아침에 출발하시겠어요?' ×, '서울에서' ×.\n"
     "4. slot_value는 사용자가 그대로 말해도 이해되는 짧은 한국어 (예: '내일', '부산').\n"
     "5. 이미 채워진 슬롯은 다시 묻지 않습니다.\n"
     "6. 필수 슬롯이 모두 채워졌으면 question/options/target_slot 모두 null."
@@ -80,6 +81,7 @@ def _user_content(text: str, slots: Dict[str, Any], today: dt.date) -> str:
     weekday = "월화수목금토일"[today.weekday()]
     return (
         f"오늘 날짜: {today.isoformat()} ({weekday}요일)\n"
+        f"{date_context(today)}\n"
         f"다가오는 명절: {', '.join(upcoming(today))}\n"
         f"현재 슬롯 상태: {json.dumps(slots, ensure_ascii=False)}\n"
         f"사용자 발화: {text}"
@@ -117,10 +119,7 @@ async def dialog_anthropic(text: str, slots: Dict[str, Any], today: dt.date) -> 
         model=settings.llm_model,
         max_tokens=1024,
         system=DIALOG_SYSTEM_PROMPT,
-        output_config={
-            "format": {"type": "json_schema", "schema": DIALOG_SCHEMA},
-            "effort": "low",
-        },
+        output_config=build_output_config(DIALOG_SCHEMA),
         messages=[{"role": "user", "content": _user_content(text, slots, today)}],
     )
     raw_text = next(b.text for b in response.content if b.type == "text")

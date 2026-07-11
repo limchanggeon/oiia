@@ -13,7 +13,7 @@ from typing import Any, Dict
 from anthropic import AsyncAnthropic
 
 from ..config import settings
-from .base import INTENT_SCHEMA, SYSTEM_PROMPT, normalize
+from .base import INTENT_SCHEMA, SYSTEM_PROMPT, build_output_config, date_context, normalize
 
 _client = None
 
@@ -31,14 +31,11 @@ async def parse_anthropic(text: str, today: dt.date) -> Dict[str, Any]:
         model=settings.llm_model,
         max_tokens=1024,
         system=SYSTEM_PROMPT,
-        output_config={
-            "format": {"type": "json_schema", "schema": INTENT_SCHEMA},
-            "effort": "low",  # 단순 추출 작업 — 지연·비용 최소화
-        },
+        output_config=build_output_config(INTENT_SCHEMA),
         messages=[
             {
                 "role": "user",
-                "content": f"오늘 날짜: {today.isoformat()} ({weekday}요일)\n사용자 문장: {text}",
+                "content": f"오늘 날짜: {today.isoformat()} ({weekday}요일)\n{date_context(today)}\n사용자 문장: {text}",
             }
         ],
     )

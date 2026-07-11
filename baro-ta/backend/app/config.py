@@ -18,7 +18,8 @@ def _bool(name: str, default: bool = False) -> bool:
 class Settings:
     # LLM 판단 엔진: rule(기본) | anthropic(상용 API) | ollama(로컬)
     llm_provider: str = os.environ.get("LLM_PROVIDER", "rule")
-    llm_model: str = os.environ.get("LLM_MODEL", "claude-opus-4-8")
+    # 팀 결정(2026-07-11): 슬롯 추출·되묻기·설명문은 Haiku로 충분 → 기본 claude-haiku-4-5
+    llm_model: str = os.environ.get("LLM_MODEL", "claude-haiku-4-5")
     ollama_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
     # 도구 어댑터: live | cache | mock (3단 폴백: live → cache → mock)
