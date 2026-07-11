@@ -117,6 +117,8 @@ LLM 호출이 실패하면 자동으로 규칙 기반 폴백하고 에이전트 
 
 ## SQLite 스키마 (`app/db.py`, WAL)
 
+> ERD와 설계 노트(관계·TTL·상태 전이·JSON 컬럼 전략)는 **[DB.md](DB.md)** 참고.
+
 | 테이블 | 용도 |
 | --- | --- |
 | `standby_sessions` | 취소표 조회 세션 (attempts/target, TTL 10분) |
