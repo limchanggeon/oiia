@@ -37,13 +37,36 @@ class ScheduleError(RuntimeError):
     """수단별 운행정보 조회 실패 — 해당 수단만 제외한다 (FR-5 예외)."""
 
 
-def fetch_live(mode: str, origin_id: str, dest_id: str, date_iso: str) -> List[Dict[str, Any]]:
-    """[실연동 교체 지점] TAGO(열차/고속/시외) · ODsay(복합) 호출.
+async def fetch_live(mode: str, origin_id: str, dest_id: str, date_iso: str) -> List[Dict[str, Any]]:
+    """TAGO 실조회 (VER3 §1: 운행정보·요금은 실제 외부 API).
 
-    반환: 정규화된 leg 목록 — mode, no, from, to, dep, arr, fare
-    (좌석 상태는 여기서 채우지 않는다. tools/seats.py 담당.)
+    반환: 정규화된 leg 목록 — mode, no, from, to, fromName, toName, dep, arr, fare
+    (좌석 상태는 여기서 채우지 않는다 — tools/seats.py 담당.)
     """
-    raise ScheduleError(f"{mode} 실연동 미구성 (TAGO 키 필요)")
+    from . import tago
+
+    if not tago.enabled():
+        raise ScheduleError("TAGO_API_KEY 미설정 — 운행정보 실조회 불가")
+
+    if mode in ("KTX", "SRT", "ITX-새마을"):
+        legs = await tago.fetch_train(origin_id, dest_id, date_iso)
+        legs = [l for l in legs if l["mode"] == mode]   # 한 응답에 여러 등급이 섞여 온다
+    elif mode == "고속버스":
+        legs = await tago.fetch_bus(origin_id, dest_id, date_iso, express=True)
+    elif mode == "시외버스":
+        legs = await tago.fetch_bus(origin_id, dest_id, date_iso, express=False)
+    else:
+        raise ScheduleError(f"지원하지 않는 수단: {mode}")
+
+    if not legs:
+        raise ScheduleError(f"{mode} 운행 편성 없음")
+
+    from ..core import places
+    o, d = places.get(origin_id) or {}, places.get(dest_id) or {}
+    for l in legs:
+        l["fromName"] = o.get("name", origin_id)
+        l["toName"] = d.get("name", dest_id)
+    return legs
 
 
 def fetch_mock(mode: str, origin_id: str, dest_id: str, arrive_by: int) -> List[Dict[str, Any]]:
@@ -83,14 +106,21 @@ def fetch_mock(mode: str, origin_id: str, dest_id: str, arrive_by: int) -> List[
     return legs
 
 
-def fetch(mode: str, origin_id: str, dest_id: str, date_iso: str, arrive_by: int) -> Dict[str, Any]:
+async def fetch(mode: str, origin_id: str, dest_id: str, date_iso: str, arrive_by: int) -> Dict[str, Any]:
     """운행정보 조회. 반환: {legs, mode(DataMode), checkedAt}
 
-    TOOL_MODE=live면 실 API를 시도하고, 실패 시 예외를 올린다 (수단 제외 → FR-5 예외).
+    TOOL_MODE=live면 TAGO 실조회. 실패는 예외로 올려 해당 수단만 제외한다 (FR-5 예외).
     TOOL_MODE=mock이면 목업을 쓰고 DataMode.SIMULATED로 표시한다 (§5-1: 상태명 혼용 금지).
     """
     checked_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     if settings.tool_mode == "live":
-        legs = fetch_live(mode, origin_id, dest_id, date_iso)  # 실패 시 ScheduleError
-        return {"legs": legs, "mode": "LIVE", "checkedAt": checked_at}
+        try:
+            legs = await fetch_live(mode, origin_id, dest_id, date_iso)
+            return {"legs": legs, "mode": "LIVE", "checkedAt": checked_at}
+        except Exception:
+            if not settings.schedule_fallback_mock:
+                raise                     # 기본: 해당 수단 제외 (FR-5 예외 규정)
+            # 폴백해도 출처를 속이지 않는다 — SIMULATED로 표시되어 카드에 그대로 노출된다
+            return {"legs": fetch_mock(mode, origin_id, dest_id, arrive_by),
+                    "mode": "SIMULATED", "checkedAt": checked_at, "fellBack": True}
     return {"legs": fetch_mock(mode, origin_id, dest_id, arrive_by), "mode": "SIMULATED", "checkedAt": checked_at}

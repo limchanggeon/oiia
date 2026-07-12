@@ -146,17 +146,22 @@ async def search(
     # ── FR-5: 수단별 운행정보 조회 (개별 장애는 해당 수단만 제외) ──
     candidates: List[Dict[str, Any]] = []
     excluded_sources: List[str] = []
+    fell_back: List[str] = []
     for mode in schedule.SOURCES:
         try:
             if mode in fail_sources:
                 raise schedule.ScheduleError(f"{mode} 조회 실패 (시뮬레이션)")
-            res = schedule.fetch(mode, origin_id, dest_id, date_iso, arrive_by)
+            res = await schedule.fetch(mode, origin_id, dest_id, date_iso, arrive_by)
+            if res.get("fellBack"):
+                fell_back.append(mode)
             for leg in res["legs"]:
                 candidates.append({"leg": leg, "mode": res["mode"], "checkedAt": res["checkedAt"]})
         except Exception:
             excluded_sources.append(mode)
     if excluded_sources:
         log.append(("SEARCH", f"운행정보 조회 실패 → 제외: {', '.join(excluded_sources)}"))
+    if fell_back:
+        log.append(("SEARCH", f"운행정보 실조회 실패 → 시뮬레이션 전환(카드에 표시): {', '.join(fell_back)}"))
 
     if not candidates:
         return {"journeys": [], "unknown": [], "excluded_sold_out": 0,
@@ -247,8 +252,8 @@ async def _recombine(
             continue
 
         try:
-            r1 = schedule.fetch("KTX", origin_id, hub, date_iso, arrive_by)
-            r2 = schedule.fetch("KTX", hub, dest_id, date_iso, arrive_by)
+            r1 = await schedule.fetch("KTX", origin_id, hub, date_iso, arrive_by)
+            r2 = await schedule.fetch("KTX", hub, dest_id, date_iso, arrive_by)
         except Exception:
             continue
 

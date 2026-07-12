@@ -3,153 +3,157 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>바로타 — 말로 하는 기차·버스 예매</title>
+<title>바로타 — 기차·버스 예매 도우미</title>
 <style>
   :root {
-    --brand: #0C5C46; --brand-deep: #073D2E; --brand-soft: #E1EEE7;
-    --accent: #F5A300; --accent-ink: #3D2A00;
-    --ink: #14211B; --ink-soft: #46564E;
-    --paper: #FFFFFF; --page: #F1F4EF; --line: #D5DCD3;
-    --danger: #C63B33; --ok: #178A4B;
-    --fs: 20px; /* 시니어 기본 글자 크기 (NFR-1) */
+    --brand:#0C5C46; --brand-deep:#073D2E; --brand-soft:#E1EEE7;
+    --accent:#F5A300; --accent-ink:#3D2A00;
+    --ink:#14211B; --ink-soft:#46564E; --line:#D5DCD3;
+    --paper:#FFFFFF; --page:#F1F4EF;
+    --danger:#C63B33; --ok:#178A4B;
+    --sim:#7A4E00; --sim-bg:#FFF3D9; --sim-line:#EBC77E;
+    --fs:20px;
   }
-  * { box-sizing: border-box; }
-  html { font-size: var(--fs); }
-  html.bigger { --fs: 24px; }
-  body {
-    margin: 0; background: var(--page); color: var(--ink);
-    font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    line-height: 1.5; -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 540px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+  *{box-sizing:border-box}
+  html{font-size:var(--fs)}
+  html.bigger{--fs:24px}
+  body{margin:0;background:var(--page);color:var(--ink);line-height:1.5;
+    font-family:"Pretendard",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:540px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 
-  header {
-    background: var(--brand); color: #fff; padding: 14px 20px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  header .logo { font-size: 1.3rem; font-weight: 800; }
-  header .logo em { font-style: normal; color: #FFC94D; }
-  header .spacer { flex: 1; }
-  .hbtn {
-    font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer;
-    background: rgba(255,255,255,.16); color: #fff; border: none; border-radius: 10px; padding: 10px 14px;
-  }
-  .hbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  header{background:var(--brand);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px}
+  header .logo{font-size:1.25rem;font-weight:800}
+  header .logo em{font-style:normal;color:#FFC94D}
+  header .spacer{flex:1}
+  .hbtn{font:inherit;font-size:.72rem;font-weight:700;cursor:pointer;background:rgba(255,255,255,.16);
+    color:#fff;border:none;border-radius:10px;padding:9px 12px}
+  .hbtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 
-  main { flex: 1; padding: 20px 18px 40px; }
-  section.screen { display: none; }
-  section.screen.active { display: block; animation: fade .25s ease; }
-  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { section.screen.active { animation: none; } }
+  /* 진행 표시 (FR-1) */
+  .progress{background:var(--paper);border-bottom:1px solid var(--line);padding:10px 18px}
+  .progress .txt{font-size:.8rem;color:var(--ink-soft);font-weight:700}
+  .bar{height:8px;background:var(--line);border-radius:99px;margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--brand);border-radius:99px;transition:width .3s}
 
-  h1 { font-size: 1.5rem; font-weight: 800; margin: 8px 0 6px; letter-spacing: -0.01em; }
-  .sub { color: var(--ink-soft); font-size: 0.9rem; margin: 0 0 20px; }
+  main{flex:1;padding:18px 16px 36px}
+  section{display:none}
+  section.on{display:block}
 
-  .card {
-    background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px;
-    padding: 20px; margin-bottom: 14px;
-  }
+  h1{font-size:1.5rem;font-weight:800;margin:6px 0 14px;text-wrap:balance}
+  .hint{color:var(--ink-soft);font-size:.85rem;margin:0 0 14px}
+  .card{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
 
-  /* 버튼 — 시니어: 크게, 확실하게 */
-  .btn {
-    display: block; width: 100%; font: inherit; cursor: pointer; text-align: center;
-    font-size: 1.1rem; font-weight: 800; padding: 18px; min-height: 64px;
-    border-radius: 16px; border: none; margin-bottom: 12px;
-  }
-  .btn-primary { background: var(--brand); color: #fff; }
-  .btn-primary:active { background: var(--brand-deep); }
-  .btn-accent { background: var(--accent); color: var(--accent-ink); }
-  .btn-ghost { background: #fff; border: 2px solid var(--line); color: var(--ink-soft); }
-  .btn-danger-ghost { background: #fff; border: 2px solid #E7C2BF; color: var(--danger); }
-  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn{display:block;width:100%;font:inherit;font-size:1.05rem;font-weight:800;cursor:pointer;
+    padding:17px;min-height:62px;border-radius:14px;border:none;margin-bottom:10px;text-align:center}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-accent{background:var(--accent);color:var(--accent-ink)}
+  .btn-ghost{background:#fff;border:2px solid var(--line);color:var(--ink-soft)}
+  .btn-danger{background:#fff;border:2px solid #E7C2BF;color:var(--danger)}
+  .btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .row{display:flex;gap:10px}
+  .row .btn{margin-bottom:0}
+  .disabled-why{color:var(--danger);font-weight:700;font-size:.9rem;margin:2px 0 10px;min-height:1.4em}
 
-  /* 입력바 + 마이크 (FR-1) */
-  .inputbar { display: flex; gap: 10px; margin: 14px 0; }
-  .inputbar input {
-    flex: 1; font: inherit; font-size: 1rem; padding: 16px; min-width: 0;
-    border: 2px solid var(--line); border-radius: 16px; background: #fff;
-  }
-  .inputbar input:focus { outline: none; border-color: var(--brand); }
-  .micbtn, .sendbtn {
-    font: inherit; cursor: pointer; border: none; border-radius: 16px;
-    width: 64px; min-width: 64px; display: grid; place-items: center;
-  }
-  .micbtn { background: #fff; border: 2px solid var(--brand); color: var(--brand); }
-  .micbtn svg { width: 28px; height: 28px; }
-  .micbtn.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity: .6; } }
-  .sendbtn { background: var(--brand); color: #fff; font-size: 1rem; font-weight: 800; }
+  input[type=text]{width:100%;font:inherit;font-size:1.05rem;padding:16px;border:2px solid var(--line);
+    border-radius:14px;background:#fff}
+  input[type=text]:focus{outline:none;border-color:var(--brand)}
 
-  .samples { display: flex; flex-wrap: wrap; gap: 10px; }
-  .chip {
-    font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-    background: #fff; border: 2px solid var(--brand); color: var(--brand);
-    border-radius: 999px; padding: 12px 16px;
-  }
+  .opt{display:flex;align-items:center;gap:10px;width:100%;font:inherit;font-size:1.02rem;font-weight:700;
+    cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:14px;padding:15px;margin-bottom:8px;text-align:left}
+  .opt:hover{border-color:var(--brand);background:var(--brand-soft)}
+  .opt.sel{border-color:var(--brand);background:var(--brand-soft)}
+  .opt .sub{font-size:.8rem;color:var(--ink-soft);font-weight:600}
+  .opt .tag{margin-left:auto;font-size:.72rem;font-weight:800;background:var(--brand-soft);color:var(--brand);
+    border-radius:8px;padding:4px 8px}
 
-  /* 홈 진행중 카드 (FR-15) */
-  .active-hold { border: 2.5px solid var(--accent); background: #FFF8E8; cursor: pointer; }
-  .active-hold b { font-size: 1.05rem; }
-  .active-hold .cnt { color: var(--danger); font-weight: 800; }
+  /* 날짜 */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+  .cal .dow{text-align:center;font-size:.72rem;color:var(--ink-soft);font-weight:700;padding:4px 0}
+  .cal button{font:inherit;font-size:.95rem;font-weight:700;aspect-ratio:1;border:2px solid transparent;
+    border-radius:10px;background:#fff;cursor:pointer;color:var(--ink)}
+  .cal button:disabled{color:#C3CBC5;cursor:not-allowed;background:transparent}
+  .cal button.sel{background:var(--brand);color:#fff}
+  .cal .nav{display:flex;justify-content:space-between;align-items:center;grid-column:1/-1;margin-bottom:4px}
+  .cal .nav b{font-size:1rem}
+  .cal .nav button{aspect-ratio:auto;padding:8px 14px;border:2px solid var(--line);width:auto}
 
-  /* 질문 화면 (FR-3) */
-  .question { font-size: 1.4rem; font-weight: 800; margin: 20px 0 18px; text-wrap: balance; }
-  .ask-hint { color: var(--ink-soft); font-size: 0.85rem; margin-top: 16px; }
+  /* 시각 */
+  .timepick{display:flex;gap:8px;align-items:center;justify-content:center;margin:10px 0}
+  .timepick select{font:inherit;font-size:1.3rem;font-weight:800;padding:14px 10px;border:2px solid var(--line);
+    border-radius:14px;background:#fff}
+  .time-preview{text-align:center;font-size:1.3rem;font-weight:800;color:var(--brand);margin:8px 0 4px}
 
-  /* 확인 요약 (FR-4) */
-  .summary-line { font-size: 1.35rem; font-weight: 800; line-height: 1.6; margin: 10px 0 20px; }
-  .slot-rows { border-top: 1.5px dashed var(--line); margin-top: 10px; padding-top: 10px; }
-  .slot-rows div { display: flex; justify-content: space-between; padding: 6px 0; font-size: 1rem; }
-  .slot-rows span { color: var(--ink-soft); }
-  .slot-rows b { font-weight: 800; }
+  /* 인원 스테퍼 */
+  .stepper{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px dashed var(--line)}
+  .stepper:last-child{border-bottom:none}
+  .stepper .lbl b{display:block;font-size:1.02rem}
+  .stepper .lbl span{font-size:.78rem;color:var(--ink-soft)}
+  .stepper .ctl{display:flex;align-items:center;gap:12px}
+  .stepper button{font:inherit;font-size:1.5rem;font-weight:800;width:52px;height:52px;border-radius:14px;
+    border:2px solid var(--brand);background:#fff;color:var(--brand);cursor:pointer;line-height:1}
+  .stepper button:disabled{border-color:var(--line);color:#C3CBC5;cursor:not-allowed}
+  .stepper .n{font-size:1.3rem;font-weight:800;min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums}
+  .total{display:flex;justify-content:space-between;font-size:1.1rem;font-weight:800;padding-top:12px;
+    border-top:2px solid var(--line);margin-top:6px}
 
-  /* 경로 카드 (FR-9) */
-  .jcard { cursor: default; }
-  .jcard .modes { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-  .mode-tag { font-size: 0.8rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); border-radius: 8px; padding: 4px 10px; }
-  .mode-tag.bus { background: #EFE7F7; color: #5E35B1; }
-  .badge-re { font-size: 0.75rem; font-weight: 800; background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 4px 10px; }
-  .jtime { display: flex; align-items: baseline; gap: 12px; }
-  .jtime .dep { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; }
-  .jtime .arr { font-size: 1.1rem; color: var(--ink-soft); }
-  .jmeta { display: flex; gap: 14px; color: var(--ink-soft); font-size: 0.95rem; margin: 6px 0 8px; flex-wrap: wrap; }
-  .jmeta b { color: var(--ink); }
-  .jexplain { background: var(--brand-soft); color: var(--brand-deep); border-radius: 12px; padding: 10px 14px; font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
-  .notice-warn { background: #FDF2E3; border: 1.5px solid #F0D5A8; color: #7A5200; border-radius: 14px; padding: 14px 16px; font-size: 0.9rem; margin-bottom: 14px; }
+  /* 요약 */
+  .sum-row{display:flex;justify-content:space-between;align-items:center;width:100%;font:inherit;
+    background:#fff;border:none;border-bottom:1.5px dashed var(--line);padding:15px 4px;cursor:pointer;text-align:left}
+  .sum-row:last-of-type{border-bottom:none}
+  .sum-row b{font-size:1.08rem;font-weight:800}
+  .sum-row .edit{font-size:.8rem;color:var(--brand);font-weight:800}
 
-  /* 선점 (FR-10) */
-  .big-ok { display: flex; justify-content: center; margin: 18px 0 0; color: var(--ok); }
-  .big-ok svg { width: 76px; height: 76px; }
-  .hold-title { text-align: center; font-size: 1.5rem; font-weight: 800; margin: 6px 0 16px; }
-  .notices li { margin-bottom: 10px; font-size: 1.02rem; }
-  .countdown { text-align: center; font-size: 2.2rem; font-weight: 800; color: var(--danger); font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
-  .countdown-label { text-align: center; color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 14px; }
-  .kv { display: flex; justify-content: space-between; padding: 6px 0; font-size: 1rem; }
-  .kv span { color: var(--ink-soft); }
-  .kv b { font-weight: 800; font-variant-numeric: tabular-nums; }
+  /* 배지 */
+  .badge{display:inline-block;font-size:.7rem;font-weight:800;border-radius:8px;padding:4px 8px;margin:0 4px 4px 0}
+  .b-sim{background:var(--sim-bg);color:var(--sim);border:1px solid var(--sim-line)}
+  .b-live{background:var(--brand-soft);color:var(--brand);border:1px solid #B9D7C8}
+  .b-unk{background:#F0F0EE;color:#5B6660;border:1px solid #D8DCD8}
+  .prov{font-size:.74rem;color:var(--ink-soft);margin-top:8px;line-height:1.45}
 
-  /* 탑승 안내 (FR-13) */
-  .reminder { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1.5px dashed var(--line); }
-  .reminder:last-child { border-bottom: none; }
-  .reminder .when { min-width: 7.5em; font-weight: 800; font-size: 0.9rem; color: var(--brand); }
-  .reminder .msg { font-size: 0.95rem; }
+  /* 경로 카드 */
+  .jcard{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+  .jcard .reasons{margin-bottom:8px}
+  .reason{display:inline-block;font-size:.75rem;font-weight:800;background:var(--brand);color:#fff;
+    border-radius:8px;padding:4px 9px;margin:0 4px 4px 0}
+  .jhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .jhead .dep{font-size:2.3rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .jhead .arr{font-size:1rem;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .jmodes{margin:6px 0}
+  .mtag{display:inline-block;font-size:.78rem;font-weight:800;background:var(--brand-soft);color:var(--brand);
+    border-radius:8px;padding:4px 9px;margin-right:4px}
+  .mtag.bus{background:#EFE7F7;color:#5E35B1}
+  .jmeta{color:var(--ink-soft);font-size:.9rem;margin:4px 0}
+  .jmeta b{color:var(--ink)}
+  .jfare{font-size:1.25rem;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+  .jfare small{font-size:.75rem;color:var(--ink-soft);font-weight:600}
+  .jexp{background:var(--brand-soft);color:var(--brand-deep);border-radius:12px;padding:10px 13px;
+    font-size:.92rem;font-weight:700;margin:8px 0}
+  .notice{border-radius:14px;padding:13px 15px;font-size:.88rem;margin-bottom:12px}
+  .n-warn{background:var(--sim-bg);border:1.5px solid var(--sim-line);color:var(--sim)}
+  .n-info{background:var(--brand-soft);border:1.5px solid #B9D7C8;color:var(--brand-deep)}
+  .n-sim-top{background:var(--sim-bg);border:1.5px solid var(--sim-line);color:var(--sim);font-weight:800;
+    text-align:center;border-radius:12px;padding:11px;margin-bottom:12px;font-size:.85rem}
 
-  /* 시연 설정 */
-  details.sim { margin-top: 26px; color: var(--ink-soft); font-size: 0.8rem; }
-  details.sim label { display: block; padding: 6px 0; }
-  details.sim input { width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
+  .countdown{text-align:center;font-size:2rem;font-weight:800;color:var(--danger);font-variant-numeric:tabular-nums;margin:4px 0 0}
+  .cd-label{text-align:center;color:var(--ink-soft);font-size:.82rem;margin-bottom:12px}
+  .kv{display:flex;justify-content:space-between;padding:7px 0;font-size:.98rem}
+  .kv span{color:var(--ink-soft)}
+  .kv b{font-weight:800}
+  ul.notices{margin:8px 0;padding-left:20px}
+  ul.notices li{margin-bottom:7px;font-size:.98rem}
+  .rem{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .rem:last-child{border-bottom:none}
+  .rem .when{min-width:8em;font-weight:800;font-size:.85rem;color:var(--brand)}
+  .rem .msg{font-size:.88rem}
 
-  /* 개발 로그 */
-  #devlog { background: var(--brand-deep); color: #BFE0CF; font: 11px/1.7 ui-monospace, Menlo, monospace;
-    max-height: 140px; overflow-y: auto; padding: 8px 16px; display: none; white-space: pre-wrap; }
-  #devlog.open { display: block; }
-
-  .toast {
-    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
-    background: var(--ink); color: #fff; padding: 14px 22px; border-radius: 14px;
-    font-size: 0.95rem; opacity: 0; pointer-events: none; transition: opacity .3s; max-width: 90%;
-  }
-  .toast.show { opacity: 1; }
+  details.sim{margin-top:20px;color:var(--ink-soft);font-size:.78rem}
+  details.sim label{display:block;padding:6px 0}
+  details.sim input{width:20px;height:20px;vertical-align:middle;margin-right:8px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:14px 20px;border-radius:14px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .3s;max-width:90%;z-index:9}
+  .toast.show{opacity:1}
+  .spin{text-align:center;color:var(--ink-soft);padding:30px 0;font-size:1rem}
 </style>
 </head>
 <body>
@@ -157,119 +161,155 @@
   <header>
     <div class="logo">바로<em>타</em></div>
     <div class="spacer"></div>
-    <button class="hbtn" id="btnBigger" aria-pressed="false">가 글씨 크게</button>
-    <button class="hbtn" id="btnHome">처음으로</button>
-    <button class="hbtn" id="btnLog">로그</button>
+    <button class="hbtn" id="bBig" aria-pressed="false">가 글씨 크게</button>
+    <button class="hbtn" id="bReset">데모 초기화</button>
   </header>
 
+  <div class="progress" id="prog" style="display:none">
+    <div class="txt" id="progTxt"></div>
+    <div class="bar"><i id="progBar" style="width:0%"></i></div>
+  </div>
+
   <main>
-    <!-- 홈: FR-1 입력 + FR-15 진행중 카드 -->
-    <section class="screen active" id="scr-home">
-      <div id="homeHoldCard"></div>
-      <h1>어디 가고 싶으세요?</h1>
-      <p class="sub">말하듯 편하게 이야기해 주세요. 마이크를 누르고 말씀하셔도 돼요.</p>
-      <div class="inputbar">
-        <input id="txt" type="text" placeholder="예: 내일 아침에 부산 가려고" aria-label="여정 입력">
-        <button class="micbtn" id="mic" title="음성으로 말하기" aria-label="음성으로 말하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
-        <button class="sendbtn" id="send">보내기</button>
-      </div>
-      <div class="samples">
-        <button class="chip" data-say="내일 아침에 서울에서 부산 가려고, 어른 두 명">내일 아침 서울에서 부산, 두 명</button>
-        <button class="chip" data-say="설 전날 대전에서 부산 내려가려고">설 전날 대전에서 부산</button>
-        <button class="chip" data-say="부산 한번 가보고 싶네">부산 가보고 싶네 (되묻기 보기)</button>
-      </div>
+    <!-- 홈 -->
+    <section id="s-home" class="on">
+      <div id="homeSim"></div>
+      <h1>어디로 가세요?</h1>
+      <p class="hint">다섯 가지만 여쭤볼게요. 한 번에 하나씩, 천천히 하시면 돼요.</p>
+      <button class="btn btn-primary" id="bStart">시작하기</button>
+      <button class="btn btn-ghost" id="bResume" style="display:none">이어서 하기</button>
       <details class="sim">
-        <summary>시연 설정 (개발용)</summary>
-        <label><input type="checkbox" id="simSoldOut"> 전 좌석 매진 (대체 여정 재조합 보기)</label>
-        <label><input type="checkbox" id="simFailSrt"> SRT 조회 장애 (일부 수단 제외 고지 보기)</label>
-        <label><input type="checkbox" id="simConflict"> 선점 경합 매진 (자리 뺏김 보기)</label>
+        <summary>시연 설정 (심사용)</summary>
+        <label><input type="checkbox" id="simSold"> 좌석 전부 매진 (대체 경로 재조합 보기)</label>
+        <label><input type="checkbox" id="simFail"> 일부 교통편 조회 장애 (SRT)</label>
+        <label><input type="checkbox" id="simSeat"> 좌석 조회 실패 (확인 불가 상태 보기)</label>
+        <label><input type="checkbox" id="simConf"> 좌석 선점 경합 실패</label>
       </details>
     </section>
 
-    <!-- 되묻기: FR-3 -->
-    <section class="screen" id="scr-ask">
-      <div class="question" id="askQ"></div>
-      <div id="askOpts"></div>
-      <div class="inputbar">
-        <input id="txtAsk" type="text" placeholder="직접 말씀하셔도 돼요" aria-label="직접 입력">
-        <button class="micbtn" id="micAsk" title="음성으로 말하기" aria-label="음성으로 말하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
-        <button class="sendbtn" id="sendAsk">보내기</button>
+    <!-- ① 출발지 -->
+    <section id="s-1">
+      <h1>어디에서 출발하세요?</h1>
+      <input type="text" id="depQ" placeholder="역이나 터미널 이름을 적어주세요" autocomplete="off">
+      <div id="depList" style="margin-top:10px"></div>
+      <div class="disabled-why" id="w1"></div>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="goHome()">이전</button>
+        <button class="btn btn-primary" id="n1" disabled>다음</button>
       </div>
-      <div class="ask-hint" id="askHint"></div>
-      <button class="btn btn-ghost" id="askReset">처음부터 다시 할게요</button>
     </section>
 
-    <!-- 확인 요약: FR-4 -->
-    <section class="screen" id="scr-confirm">
-      <h1>이렇게 찾아볼까요?</h1>
-      <div class="card">
-        <div class="summary-line" id="confirmSummary"></div>
-        <div class="slot-rows" id="confirmRows"></div>
+    <!-- ② 도착지 -->
+    <section id="s-2">
+      <h1>어디로 가세요?</h1>
+      <input type="text" id="arrQ" placeholder="역이나 터미널 이름을 적어주세요" autocomplete="off">
+      <div id="arrList" style="margin-top:10px"></div>
+      <div class="disabled-why" id="w2"></div>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="step(1)">이전</button>
+        <button class="btn btn-primary" id="n2" disabled>다음</button>
       </div>
-      <button class="btn btn-primary" id="btnYes">네, 맞아요</button>
-      <button class="btn btn-ghost" id="btnFix">고칠게요</button>
-      <div id="fixPanel" style="display:none">
-        <div class="card">
-          <b>무엇을 고칠까요?</b>
-          <div class="samples" style="margin-top:12px" id="fixChips"></div>
+    </section>
+
+    <!-- ③ 날짜 -->
+    <section id="s-3">
+      <h1>언제 가세요?</h1>
+      <button class="opt" id="qToday"></button>
+      <button class="opt" id="qTomorrow"></button>
+      <div class="card"><div class="cal" id="cal"></div></div>
+      <div class="disabled-why" id="w3"></div>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="step(2)">이전</button>
+        <button class="btn btn-primary" id="n3" disabled>다음</button>
+      </div>
+    </section>
+
+    <!-- ④ 도착 마감 시각 -->
+    <section id="s-4">
+      <h1>몇 시까지 도착해야 하나요?</h1>
+      <p class="hint">출발 시각이 아니라 <b>도착</b> 기준이에요.</p>
+      <div class="card">
+        <div class="timepick">
+          <select id="tAmpm"><option value="am">오전</option><option value="pm">오후</option></select>
+          <select id="tH"></select>
+          <select id="tM"></select>
         </div>
+        <div class="time-preview" id="tPrev">—</div>
+      </div>
+      <div class="disabled-why" id="w4"></div>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="step(3)">이전</button>
+        <button class="btn btn-primary" id="n4" disabled>다음</button>
       </div>
     </section>
 
-    <!-- 경로 제시: FR-9 -->
-    <section class="screen" id="scr-results">
-      <h1 id="resultsTitle">표를 찾고 있어요…</h1>
-      <p class="sub" id="resultsSub"></p>
-      <div id="resultsNotice"></div>
-      <div id="resultsList"></div>
-      <button class="btn btn-ghost" id="btnResultsBack">조건을 바꿀래요</button>
+    <!-- ⑤ 인원 -->
+    <section id="s-5">
+      <h1>몇 분이 가세요?</h1>
+      <div class="card" id="pax"></div>
+      <div class="disabled-why" id="w5"></div>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="step(4)">이전</button>
+        <button class="btn btn-primary" id="n5" disabled>다음</button>
+      </div>
     </section>
 
-    <!-- 좌석 선점: FR-10 -->
-    <section class="screen" id="scr-hold">
-      <div class="big-ok" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-6"/></svg></div>
-      <div class="hold-title">자리를 잡아뒀어요</div>
+    <!-- 확인 요약 -->
+    <section id="s-sum">
+      <h1>이대로 찾아볼까요?</h1>
+      <p class="hint">고칠 곳을 누르면 그 화면만 다시 열려요.</p>
+      <div class="card" id="sumRows"></div>
+      <button class="btn btn-primary" id="bSearch">이대로 찾기</button>
+      <button class="btn btn-ghost" onclick="goHome()">처음으로</button>
+    </section>
+
+    <!-- 결과 -->
+    <section id="s-res">
+      <h1 id="resTitle">표를 찾고 있어요…</h1>
+      <div id="resNotice"></div>
+      <div id="resList"></div>
+      <div id="resUnknown"></div>
+      <button class="btn btn-ghost" id="bBackSum">조건 고치기</button>
+    </section>
+
+    <!-- 좌석 선점 -->
+    <section id="s-hold">
+      <div class="n-sim-top">시뮬레이션 — 실제 예약·결제가 되지 않습니다</div>
+      <h1>자리를 잡아뒀어요</h1>
       <div class="card">
-        <div class="countdown" id="holdCount">--:--</div>
-        <div class="countdown-label">이 시간 안에 결제하면 돼요</div>
+        <div class="countdown" id="cd">--:--</div>
+        <div class="cd-label">이 시간 안에 결제 화면을 체험하면 돼요</div>
         <ul class="notices" id="holdNotices"></ul>
-        <div class="slot-rows" id="holdInfo"></div>
+        <div id="holdInfo"></div>
       </div>
-      <div id="holdBusNotice"></div>
-      <button class="btn btn-accent" id="btnGoPay">결제하러 가기</button>
-      <button class="btn btn-danger-ghost" id="btnCancelHold">이 표는 취소할게요</button>
+      <button class="btn btn-accent" id="bPay">결제 화면 체험하기</button>
+      <button class="btn btn-danger" id="bCancel">시뮬레이션 취소</button>
     </section>
 
-    <!-- 결제: FR-11 (결제 자동화 금지 — 안내만) -->
-    <section class="screen" id="scr-pay">
-      <h1>결제는 직접 해주세요</h1>
-      <p class="sub">이 앱은 카드 번호를 묻지 않아요. 결제는 코레일 앱·역 창구에서 어르신이 직접 하세요.</p>
-      <div class="card">
-        <div class="kv"><span>예약번호</span><b id="payReserveNo">-</b></div>
-        <div class="kv"><span>결제할 금액</span><b id="payFare">-</b></div>
-        <div class="kv"><span>남은 시간</span><b id="payCount">-</b></div>
-      </div>
-      <button class="btn btn-primary" id="btnPaid">결제를 마쳤어요</button>
-      <button class="btn btn-ghost" id="btnPayBack">아직이에요, 돌아갈게요</button>
+    <!-- 결제 -->
+    <section id="s-pay">
+      <div class="n-sim-top">대회 시연용 결제 화면입니다. 실제 결제되지 않습니다.</div>
+      <h1>결제 체험</h1>
+      <p class="hint">카드 번호는 묻지 않아요. 버튼만 누르면 돼요.</p>
+      <div class="card" id="payInfo"></div>
+      <button class="btn btn-primary" id="bDone">결제 완료 체험</button>
+      <button class="btn btn-ghost" id="bBackHold">돌아가기</button>
     </section>
 
-    <!-- 완료 + 탑승 안내: FR-13 -->
-    <section class="screen" id="scr-done">
-      <div class="big-ok" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></svg></div>
-      <div class="hold-title">예매가 끝났어요</div>
+    <!-- 완료 -->
+    <section id="s-done">
+      <div class="n-sim-top">시뮬레이션 완료 — 실제 승차권이 아닙니다</div>
+      <h1>체험이 끝났어요</h1>
+      <div class="card" id="doneInfo"></div>
       <div class="card">
-        <div class="slot-rows" id="doneInfo"></div>
+        <b>이때 이메일로 알려드려요</b>
+        <p class="hint" style="margin:6px 0 10px">출발 전날 오후 6시와 출발 2시간 전에 보내드려요.</p>
+        <div id="doneRem"></div>
+        <button class="btn btn-accent" id="bNotify" style="margin-top:10px">알림 시연 (지금 보내기)</button>
       </div>
-      <div class="card">
-        <b>이때 알려드릴게요</b>
-        <p class="sub" style="margin:6px 0 10px">전날 저녁과 당일 아침에 알려드릴게요.</p>
-        <div id="doneReminders"></div>
-      </div>
-      <button class="btn btn-primary" id="btnDoneHome">처음으로</button>
+      <button class="btn btn-ghost" onclick="goHome()">처음으로</button>
     </section>
   </main>
-
-  <div id="devlog"></div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -278,366 +318,427 @@
 const $ = (s) => document.querySelector(s);
 const SID = localStorage.getItem("barota-sid") ||
   (() => { const s = "s_" + Math.random().toString(36).slice(2, 10); localStorage.setItem("barota-sid", s); return s; })();
-const DEMO = new URLSearchParams(location.search).has("demo");
 
-let lastSlots = null;
-let currentHold = null;
-let countTimer = null;
+const STEPS = ["departure", "arrival", "date", "arrivalTime", "passengers"];
+let cur = 0;                 // 0=홈, 1~5=단계, 6=요약
+let input = { passengers: { senior: 0, adult: 0, student: 0 } };
+let calMonth = new Date();
+let journeys = [];
+let sim = null;              // 현재 시뮬레이션 예약
+let cdTimer = null;
 
-/* ── 공통 ─────────────────────────────── */
+/* ── 공통 ─────────────────────────── */
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
+async function api(path, opt) {
+  const r = await fetch("/api/v3" + path, { headers: { "Content-Type": "application/json" }, ...opt });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); const e = new Error(b.detail || "연결이 어려워요"); e.status = r.status; throw e; }
+  return r.json();
+}
+const simOpts = () => ({
+  soldOutAll: $("#simSold").checked,
+  failSources: $("#simFail").checked ? ["SRT"] : [],
+  seatLookupFail: $("#simSeat").checked,
+  holdConflict: $("#simConf").checked,
+});
+const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const won = (n) => n.toLocaleString("ko-KR") + "원";
+const ampm = (m) => { const h = Math.floor(m / 60), mi = m % 60;
+  return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}시${mi ? " " + mi + "분" : ""}`; };
+const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+
 function show(id) {
-  document.querySelectorAll("section.screen").forEach((s) => s.classList.remove("active"));
-  $("#scr-" + id).classList.add("active");
+  document.querySelectorAll("section").forEach((s) => s.classList.remove("on"));
+  $("#" + id).classList.add("on");
   window.scrollTo(0, 0);
 }
-function toast(msg) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 3200);
-}
-async function api(path, opts) {
-  const res = await fetch("/api/v2" + path, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const err = new Error(body.detail || "연결이 어려워요");
-    err.status = res.status;
-    throw err;
+function step(n) {
+  cur = n;
+  if (n >= 1 && n <= 5) {
+    show("s-" + n);
+    $("#prog").style.display = "block";
+    $("#progTxt").textContent = `5단계 중 ${n}번째`;
+    $("#progBar").style.width = (n / 5 * 100) + "%";
+    validate();
   }
-  return res.json();
 }
-function sim() {
-  return {
-    soldOutAll: $("#simSoldOut").checked,
-    failSources: $("#simFailSrt").checked ? ["SRT"] : [],
-    holdConflict: $("#simConflict").checked,
+function goHome() { cur = 0; $("#prog").style.display = "none"; show("s-home"); refreshHome(); }
+
+/* ── 단계 검증 (서버가 판단) ─────────── */
+async function validate() {
+  if (cur < 1 || cur > 5) return;
+  const stepName = STEPS[cur - 1];
+  try {
+    const r = await api("/input/validate", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: SID, step: stepName, input }),
+    });
+    input = { ...input, ...r.input };
+    $("#n" + cur).disabled = !r.ok;
+    $("#w" + cur).textContent = r.ok ? "" : r.message;
+  } catch (e) { toast(e.message); }
+}
+
+/* ── ①② 장소 ─────────────────────── */
+function placeSearch(qEl, listEl, key, nextStep) {
+  let timer = null;
+  qEl.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = qEl.value.trim();
+    if (!q) { listEl.innerHTML = ""; return; }
+    timer = setTimeout(async () => {
+      const r = await api(`/places/search?q=${encodeURIComponent(q)}`);
+      listEl.innerHTML = "";
+      if (!r.places.length) { listEl.innerHTML = `<p class="hint">그런 이름을 못 찾았어요. 다르게 적어보세요.</p>`; return; }
+      r.places.forEach((p) => {
+        const b = document.createElement("button");
+        b.className = "opt";
+        b.innerHTML = `<span><b>${p.display}</b><br><span class="sub">${p.type === "station" ? "기차역" : "버스터미널"}</span></span>`;
+        b.onclick = () => {
+          input[key] = p;
+          listEl.querySelectorAll(".opt").forEach((x) => x.classList.remove("sel"));
+          b.classList.add("sel");
+          qEl.value = p.name;
+          validate();
+        };
+        listEl.appendChild(b);
+      });
+    }, 180);
+  });
+}
+placeSearch($("#depQ"), $("#depList"), "departure");
+placeSearch($("#arrQ"), $("#arrList"), "arrival");
+
+// 현재 위치 추천 (자동 확정하지 않음)
+async function loadNearest() {
+  try {
+    const r = await api("/places/nearest");
+    const p = r.places[0];
+    if (!p) return;
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.innerHTML = `<span><b>${p.display}</b><br><span class="sub">지금 계신 곳에서 가까워요</span></span><span class="tag">추천</span>`;
+    b.onclick = () => { input.departure = p; $("#depQ").value = p.name; b.classList.add("sel"); validate(); };
+    $("#depList").prepend(b);
+  } catch (e) { /* 위치 실패는 오류가 아니다 — 키보드 입력으로 계속 (FR-2) */ }
+}
+
+/* ── ③ 날짜 ──────────────────────── */
+function pickDate(iso) { input.date = iso; renderCal(); validate(); }
+function renderQuick() {
+  const t = new Date(), tm = new Date(Date.now() + 864e5);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const lbl = (d, n) => `${n} · ${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일`;
+  $("#qToday").innerHTML = `<b>${lbl(t, "오늘")}</b>`;
+  $("#qTomorrow").innerHTML = `<b>${lbl(tm, "내일")}</b>`;
+  $("#qToday").onclick = () => pickDate(iso(t));
+  $("#qTomorrow").onclick = () => pickDate(iso(tm));
+}
+function renderCal() {
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let h = `<div class="nav"><button id="cPrev">‹ 이전달</button><b>${y}년 ${m + 1}월</b><button id="cNext">다음달 ›</button></div>`;
+  DOW.forEach((d) => h += `<div class="dow">${d}</div>`);
+  for (let i = 0; i < first.getDay(); i++) h += "<div></div>";
+  for (let d = 1; d <= last.getDate(); d++) {
+    const dt = new Date(y, m, d);
+    const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const past = dt < today;
+    h += `<button data-iso="${iso}" ${past ? "disabled" : ""} class="${input.date === iso ? "sel" : ""}">${d}</button>`;
+  }
+  $("#cal").innerHTML = h;
+  $("#cPrev").onclick = () => { calMonth = new Date(y, m - 1, 1); renderCal(); };
+  $("#cNext").onclick = () => { calMonth = new Date(y, m + 1, 1); renderCal(); };
+  $("#cal").querySelectorAll("button[data-iso]").forEach((b) => {
+    if (!b.disabled) b.onclick = () => pickDate(b.dataset.iso);
+  });
+  $("#qToday").classList.toggle("sel", input.date === new Date().toISOString().slice(0, 10));
+  $("#qTomorrow").classList.toggle("sel", input.date === new Date(Date.now() + 864e5).toISOString().slice(0, 10));
+}
+
+/* ── ④ 도착 마감 시각 (5분 단위) ────── */
+function initTime() {
+  const H = $("#tH"), M = $("#tM");
+  for (let h = 1; h <= 12; h++) H.add(new Option(h + "시", h));
+  for (let m = 0; m < 60; m += 5) M.add(new Option(String(m).padStart(2, "0") + "분", m));
+  const upd = () => {
+    let h = +H.value % 12;
+    if ($("#tAmpm").value === "pm") h += 12;
+    input.arrivalTime = h * 60 + (+M.value);
+    $("#tPrev").textContent = ampm(input.arrivalTime) + "까지 도착";
+    validate();
   };
-}
-const fmt = (m) => `${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-const won = (n) => n.toLocaleString("ko-KR") + "원";
-
-/* ── FR-2/3/4: 대화 ─────────────────────── */
-async function sendText(text) {
-  text = (text || "").trim();
-  if (!text) return;
-  try {
-    const r = await api("/dialog/turn", { method: "POST", body: JSON.stringify({ sessionId: SID, text }) });
-    lastSlots = r.slots;
-    if (r.next.type === "ask") renderAsk(r);
-    else renderConfirm(r);
-  } catch (e) {
-    toast("지금은 연결이 어려워요. 잠시 후 다시 해주세요.");
-  }
+  [H, M, $("#tAmpm")].forEach((el) => el.onchange = upd);
+  $("#tAmpm").value = "pm"; H.value = 2; M.value = 0;
 }
 
-function renderAsk(r) {
-  $("#askQ").textContent = r.next.question;
-  const box = $("#askOpts");
-  box.innerHTML = "";
-  r.next.options.forEach((o) => {
-    const b = document.createElement("button");
-    b.className = "btn btn-primary";
-    b.textContent = o.label;
-    b.onclick = () => sendText(o.slot_value);
-    box.appendChild(b);
-  });
-  $("#askHint").textContent = r.askCount >= 3 ? "여러 번 여쭤봐서 죄송해요. 아래에서 처음부터 다시 하셔도 돼요." : "";
-  show("ask");
-}
-
-function renderConfirm(r) {
-  $("#confirmSummary").textContent = r.next.summary;
-  const s = r.slots;
-  $("#confirmRows").innerHTML = `
-    <div><span>가는 날</span><b>${s.date.md} (${s.date.label})</b></div>
-    <div><span>가는 길</span><b>${s.departure} → ${s.arrival}</b></div>
-    <div><span>시간대</span><b>${s.timeOfDay}</b></div>
-    <div><span>인원</span><b>어른 ${s.passengers}명</b></div>`;
-  $("#fixPanel").style.display = "none";
-  show("confirm");
-  if (DEMO) setTimeout(() => $("#btnYes").click(), 1500);
-}
-
-const FIX_CHIPS = [
-  ["서울에서 출발", "대전에서 출발", "동대구에서 출발"],
-  ["부산까지", "강릉까지", "대전까지"],
-  ["오늘", "내일", "모레"],
-  ["혼자", "두 명", "세 명"],
+/* ── ⑤ 인원 ─────────────────────── */
+const PAX = [
+  ["senior", "노약자", "만 65세 이상"],
+  ["adult", "성인", "일반 요금"],
+  ["student", "학생", "확인된 할인 규칙이 있을 때만 적용돼요"],
 ];
-$("#btnFix").onclick = () => {
-  const panel = $("#fixPanel");
-  panel.style.display = "block";
-  const box = $("#fixChips");
-  box.innerHTML = "";
-  FIX_CHIPS.flat().forEach((v) => {
-    const b = document.createElement("button");
-    b.className = "chip";
-    b.textContent = v;
-    b.onclick = () => sendText(v);
-    box.appendChild(b);
+function renderPax() {
+  $("#pax").innerHTML = PAX.map(([k, t, s]) => `
+    <div class="stepper">
+      <div class="lbl"><b>${t}</b><span>${s}</span></div>
+      <div class="ctl">
+        <button data-k="${k}" data-d="-1" ${input.passengers[k] === 0 ? "disabled" : ""}>－</button>
+        <span class="n">${input.passengers[k]}</span>
+        <button data-k="${k}" data-d="1">＋</button>
+      </div>
+    </div>`).join("") +
+    `<div class="total"><span>총인원</span><span>${input.passengers.senior + input.passengers.adult + input.passengers.student}명</span></div>`;
+  $("#pax").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const k = b.dataset.k, d = +b.dataset.d;
+    input.passengers[k] = Math.max(0, Math.min(9, input.passengers[k] + d));
+    renderPax(); validate();
   });
-};
+}
 
-/* ── FR-6/7/8/9: 검색·경로 카드 ───────────── */
-$("#btnYes").onclick = search;
-async function search() {
-  $("#resultsTitle").textContent = "표를 찾고 있어요…";
-  $("#resultsSub").textContent = "기차와 버스를 한꺼번에 알아보고 있어요.";
-  $("#resultsNotice").innerHTML = "";
-  $("#resultsList").innerHTML = "";
-  show("results");
+/* ── 확인 요약 ──────────────────── */
+async function renderSummary() {
+  const r = await api(`/input/${SID}`);
+  const rows = [
+    [`${input.departure?.name} → ${input.arrival?.name}`, 1],
+    [r.lines[1] || "", 3],
+    [r.lines[2] || "", 4],
+    [`${r.lines[3] || ""}<br>${r.lines[4] || ""}`, 5],
+  ];
+  $("#sumRows").innerHTML = rows.map(([t, s]) =>
+    `<button class="sum-row" data-s="${s}"><b>${t}</b><span class="edit">고치기</span></button>`).join("");
+  $("#sumRows").querySelectorAll(".sum-row").forEach((b) => b.onclick = () => step(+b.dataset.s));
+  cur = 6;
+  $("#prog").style.display = "none";
+  show("s-sum");
+}
+
+/* ── 검색 결과 (FR-8) ────────────── */
+function seatBadge(st) {
+  if (st.startsWith("LIVE_")) return `<span class="badge b-live">좌석 실시간</span>`;
+  if (st.startsWith("SIMULATED_")) return `<span class="badge b-sim">좌석 시뮬레이션</span>`;
+  return `<span class="badge b-unk">좌석 확인 불가</span>`;
+}
+function jcard(j, idx) {
+  const modes = j.legs.map((l) => `<span class="mtag ${l.mode.includes("버스") ? "bus" : ""}">${l.mode}</span>`).join("");
+  const tr = j.transfers === 0 ? "갈아타지 않아요"
+    : `${j.transferAt}에서 한 번 갈아타요 · ${j.transferWaitMin}분 기다려요`;
+  const f = j.fare;
+  const px = [];
+  if (f.seniorTotal) px.push(`노약자 ${won(f.seniorEach)}`);
+  if (f.adultTotal) px.push(`성인 ${won(f.adultEach)}`);
+  if (f.studentTotal) px.push(`학생 ${won(f.studentEach)}`);
+  return `
+  <div class="jcard">
+    <div class="reasons">${j.reasons.map((r) => `<span class="reason">${r}</span>`).join("")}</div>
+    <div class="jmodes">${modes}${seatBadge(j.seatStatus)}</div>
+    <div class="jhead"><span class="dep">${fmt(j.dep)}</span><span class="arr">→ ${fmt(j.arr)} 도착</span></div>
+    <div class="jmeta">${Math.floor(j.durationMin / 60)}시간 ${j.durationMin % 60}분 걸려요 · ${tr}</div>
+    <div class="jfare">${won(f.total)} <small>${px.join(" · ")}</small></div>
+    ${f.notes.length ? `<div class="jmeta" style="color:var(--sim)"><b>${f.notes.join(" · ")}</b></div>` : ""}
+    ${j.explain ? `<div class="jexp">${j.explain}</div>` : ""}
+    <div class="prov">${j.provenance.label}</div>
+    <button class="btn ${idx === 0 ? "btn-primary" : "btn-ghost"}" style="margin:12px 0 0" data-jid="${j.id}">이 차로 할게요</button>
+  </div>`;
+}
+async function doSearch(extra) {
+  show("s-res");
+  $("#resTitle").textContent = "표를 찾고 있어요…";
+  $("#resNotice").innerHTML = ""; $("#resList").innerHTML = `<div class="spin">기차와 버스를 함께 알아보고 있어요…</div>`;
+  $("#resUnknown").innerHTML = "";
   try {
-    const r = await api("/journeys/search", {
+    const r = await api("/search", {
       method: "POST",
-      body: JSON.stringify({ sessionId: SID, sim: { ...sim(), holdConflict: false } }),
+      body: JSON.stringify({ sessionId: SID, sim: simOpts(), ...(extra || {}) }),
     });
-    renderResults(r);
+    journeys = r.journeys;
+    $("#resTitle").textContent = r.recombined ? "갈아타는 길을 찾았어요"
+      : r.journeys.length ? "탈 수 있는 표예요" : "조건에 맞는 표가 없어요";
+
+    let n = "";
+    if (r.recombined) n += `<div class="notice n-info">바로 가는 차가 모두 매진이라, 한 번 갈아타는 길을 찾았어요.</div>`;
+    if (r.excludedSources.length) n += `<div class="notice n-warn">일부 교통편(${r.excludedSources.join(", ")})은 확인하지 못했어요.
+      <button class="btn btn-ghost" style="margin-top:8px" onclick="doSearch()">다시 확인</button></div>`;
+    if (r.hasUnknown) n += `<div class="notice n-warn">좌석 정보를 확인하지 못한 교통편이 있어요. 어떻게 할까요?
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-ghost" onclick="doSearch()">다시 확인</button>
+        <button class="btn btn-ghost" onclick="doSearch({useSimulatedForUnknown:true})">시뮬레이션으로 보기</button>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:8px" onclick="doSearch({onlyConfirmed:true})">확인된 결과만 보기</button></div>`;
+    $("#resNotice").innerHTML = n;
+
+    $("#resList").innerHTML = r.journeys.length
+      ? r.journeys.map(jcard).join("")
+      : `<div class="card">지금 조건으로는 탈 수 있는 표가 없어요. 시각이나 날짜를 바꿔보세요.</div>`;
+    $("#resList").querySelectorAll("button[data-jid]").forEach((b) =>
+      b.onclick = () => hold(journeys.find((j) => j.id === b.dataset.jid)));
+
+    if (r.unknownJourneys.length) {
+      $("#resUnknown").innerHTML = `<h1 style="font-size:1.1rem;margin-top:22px">좌석을 확인하지 못한 교통편</h1>` +
+        r.unknownJourneys.slice(0, 3).map((j) => `
+          <div class="jcard" style="opacity:.85">
+            <div class="jmodes">${j.legs.map((l) => `<span class="mtag">${l.mode}</span>`).join("")}${seatBadge(j.seatStatus)}</div>
+            <div class="jhead"><span class="dep" style="font-size:1.6rem">${fmt(j.dep)}</span><span class="arr">→ ${fmt(j.arr)}</span></div>
+            <div class="prov">${j.provenance.label}</div>
+          </div>`).join("");
+    }
   } catch (e) {
-    $("#resultsTitle").textContent = "표를 찾지 못했어요";
-    $("#resultsSub").textContent = e.message;
+    $("#resTitle").textContent = "표를 찾지 못했어요";
+    $("#resList").innerHTML = `<div class="card">${e.message}</div>`;
   }
 }
 
-function renderResults(r) {
-  $("#resultsTitle").textContent = r.recombined ? "갈아타는 길을 찾았어요" : "탈 수 있는 표예요";
-  $("#resultsSub").textContent = r.recombined
-    ? "바로 가는 차는 모두 매진이라, 갈아타는 길을 대신 찾았어요."
-    : "매진된 차는 빼고 보여드려요.";
-  const notice = $("#resultsNotice");
-  if (r.excludedSources.length) {
-    notice.innerHTML = `<div class="notice-warn">일부 교통편(${r.excludedSources.join(", ")})은 확인하지 못했어요.
-      <button class="chip" style="margin-top:8px" onclick="search()">다시 확인해보기</button></div>`;
-  }
-  const list = $("#resultsList");
-  list.innerHTML = "";
-  if (!r.journeys.length) {
-    list.innerHTML = `<div class="card">지금 조건으로는 표가 없어요. 시간대나 날짜를 바꿔보세요.</div>`;
-    return;
-  }
-  r.journeys.forEach((j, idx) => {
-    const modes = j.legs.map((l) =>
-      `<span class="mode-tag ${l.mode.includes("버스") ? "bus" : ""}">${l.mode}</span>`).join("");
-    const transfer = j.transfers === 0
-      ? "갈아타지 않아요"
-      : `${j.legs[0].to}에서 1번 갈아타요 (${j.transferWaitMin}분 기다려요)`;
-    const card = document.createElement("div");
-    card.className = "card jcard";
-    card.innerHTML = `
-      <div class="modes">${modes}${r.recombined ? '<span class="badge-re">대체 경로</span>' : ""}</div>
-      <div class="jtime"><span class="dep">${fmt(j.dep)}</span><span class="arr">→ ${fmt(j.arr)} 도착</span></div>
-      <div class="jmeta"><span><b>${won(j.totalFare)}</b></span><span>${Math.floor(j.durationMin / 60)}시간 ${j.durationMin % 60}분</span><span>${transfer}</span></div>
-      ${j.explain ? `<div class="jexplain">${j.explain}</div>` : ""}
-      <button class="btn ${idx === 0 ? "btn-primary" : "btn-ghost"}" style="margin-bottom:0">이 차로 할게요</button>`;
-    card.querySelector("button").onclick = () => hold(j);
-    list.appendChild(card);
-  });
-  if (DEMO) setTimeout(() => { const b = list.querySelector("button"); if (b) b.click(); }, 1800);
-}
-$("#btnResultsBack").onclick = () => show("confirm");
-
-/* ── FR-10: 좌석 선점 ─────────────────────── */
-async function hold(journey) {
+/* ── 좌석 선점 (FR-9) ────────────── */
+async function hold(j) {
+  if (!j) return;
   try {
-    const h = await api("/holds", {
+    sim = await api("/sim/hold", {
       method: "POST",
-      body: JSON.stringify({
-        sessionId: SID,
-        journey,
-        passengers: (lastSlots && lastSlots.passengers) || 1,
-        dateIso: lastSlots && lastSlots.date ? lastSlots.date.iso : null,
-        sim: { soldOutAll: false, failSources: [], holdConflict: sim().holdConflict },
-      }),
+      body: JSON.stringify({ sessionId: SID, journey: j, seatPreference: "any", sim: simOpts() }),
     });
-    currentHold = h;
-    renderHold(h);
+    renderHold();
   } catch (e) {
     if (e.status === 409) {
-      // FR-10 예외: 경합 매진 → 동의 후 재조합 (FR-8)
-      if (confirm("방금 자리가 나갔어요.\n다른 길을 찾아볼까요?")) {
-        $("#simConflict").checked = false;
-        $("#simSoldOut").checked = true; // 재조합 흐름 시연
-        search();
+      if (confirm("방금 자리가 나간 상황을 시연하고 있어요.\n다른 길을 찾아볼까요?")) {
+        $("#simConf").checked = false; $("#simSold").checked = true; doSearch();
       }
-    } else {
-      toast(e.message);
-    }
+    } else toast(e.message);
   }
 }
-
-function startCountdown(get, el, onExpire) {
-  clearInterval(countTimer);
+function startCd(sec, onEnd) {
+  clearInterval(cdTimer);
+  const end = Date.now() + sec * 1000;
   const tick = () => {
-    const s = get();
-    if (s <= 0) { el.textContent = "00:00"; clearInterval(countTimer); if (onExpire) onExpire(); return; }
-    el.textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    const s = Math.max(0, Math.round((end - Date.now()) / 1000));
+    $("#cd").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    if (s <= 0) { clearInterval(cdTimer); if (onEnd) onEnd(); }
   };
-  tick();
-  countTimer = setInterval(tick, 1000);
+  tick(); cdTimer = setInterval(tick, 1000);
 }
-
-function renderHold(h) {
-  const deadline = Date.now() + h.remainingSec * 1000;
-  startCountdown(
-    () => Math.max(0, Math.round((deadline - Date.now()) / 1000)),
-    $("#holdCount"),
-    () => { toast("결제 시간이 지나 자동으로 취소됐어요. 돈은 나가지 않았어요."); goHome(); }
-  );
-  $("#holdNotices").innerHTML = h.notices.map((n) => `<li>${n}</li>`).join("");
-  const j = h.journey;
+function renderHold() {
+  const j = sim.journey;
+  $("#holdNotices").innerHTML = sim.notices.map((n) => `<li>${n}</li>`).join("");
   $("#holdInfo").innerHTML = `
-    <div><span>가는 길</span><b>${j.legs[0]["from"]} → ${j.legs[j.legs.length - 1].to}</b></div>
-    <div><span>출발</span><b>${fmt(j.dep)}</b></div>
-    <div><span>예약번호</span><b>${h.reserveNo || "없음(버스)"}</b></div>
-    <div><span>금액</span><b>${won(h.fare)}</b></div>`;
-  $("#holdBusNotice").innerHTML = h.unreservableLegs.length
-    ? `<div class="notice-warn">${h.unreservableLegs[0].notice}</div>` : "";
-  show("hold");
+    <div class="kv"><span>가는 길</span><b>${j.legs[0].fromName} → ${j.legs[j.legs.length - 1].toName}</b></div>
+    <div class="kv"><span>출발</span><b>${fmt(j.dep)}</b></div>
+    <div class="kv"><span>좌석</span><b>${sim.seats.map((s) => s.label).join(", ")}</b></div>
+    <div class="kv"><span>데모 번호</span><b>${sim.demoId}</b></div>
+    <div class="kv"><span>금액</span><b>${won(sim.fare.total)}</b></div>`;
+  startCd(sim.remainingSec, () => { toast("시간이 지나 시뮬레이션이 만료됐어요."); goHome(); });
+  show("s-hold");
 }
-
-$("#btnGoPay").onclick = () => {
-  if (!currentHold) return;
-  $("#payReserveNo").textContent = currentHold.reserveNo || "없음(버스)";
-  $("#payFare").textContent = won(currentHold.fare);
-  const deadline = Date.now() + Math.max(0, currentHold.remainingSec * 1000);
-  startCountdown(() => Math.max(0, Math.round((deadline - Date.now()) / 1000)), $("#payCount"));
-  show("pay");
+$("#bPay").onclick = async () => {
+  sim = await api(`/sim/${sim.demoId}/open-payment`, { method: "POST", body: "{}" });
+  $("#payInfo").innerHTML = `
+    <div class="kv"><span>데모 번호</span><b>${sim.demoId}</b></div>
+    <div class="kv"><span>금액</span><b>${won(sim.fare.total)}</b></div>
+    <div class="kv"><span>인원</span><b>총 ${sim.passengers.total}명</b></div>`;
+  show("s-pay");
 };
-$("#btnPayBack").onclick = () => renderHold(currentHold);
-$("#btnCancelHold").onclick = async () => {
-  if (!currentHold) return;
-  if (!confirm("이 표를 취소할까요? 돈은 나가지 않았어요.")) return;
-  try {
-    await api(`/holds/${currentHold.holdId}/cancel`, { method: "POST", body: "{}" });
-    toast("취소했어요. 돈은 한 푼도 나가지 않았어요.");
-    goHome();
-  } catch (e) { toast(e.message); }
+$("#bBackHold").onclick = () => renderHold();
+$("#bCancel").onclick = async () => {
+  if (!confirm("이 시뮬레이션을 취소할까요?")) return;
+  await api(`/sim/${sim.demoId}/cancel`, { method: "POST", body: "{}" });
+  toast("취소했어요. 실제로는 아무 일도 일어나지 않았어요."); goHome();
 };
-
-/* ── FR-11/13: 결제 확인 → 탑승 안내 ───────── */
-$("#btnPaid").onclick = async () => {
-  if (!currentHold) return;
-  try {
-    const h = await api(`/holds/${currentHold.holdId}/pay-confirmed`, { method: "POST", body: "{}" });
-    currentHold = h;
-    renderDone(h);
-  } catch (e) { toast(e.message); }
-};
-
-function renderDone(h) {
-  clearInterval(countTimer);
-  const j = h.journey;
+$("#bDone").onclick = async () => {
+  sim = await api(`/sim/${sim.demoId}/complete`, { method: "POST", body: "{}" });
+  clearInterval(cdTimer);
+  const j = sim.journey;
   $("#doneInfo").innerHTML = `
-    <div><span>가는 날</span><b>${h.dateIso || "-"}</b></div>
-    <div><span>가는 길</span><b>${j.legs[0]["from"]} → ${j.legs[j.legs.length - 1].to}</b></div>
-    <div><span>출발 시각</span><b>${fmt(j.dep)}</b></div>
-    <div><span>예약번호</span><b>${h.reserveNo || "-"}</b></div>
-    <div><span>낸 금액</span><b>${won(h.fare)}</b></div>`;
-  $("#doneReminders").innerHTML = h.reminders.length
-    ? h.reminders.map((r) => `<div class="reminder"><div class="when">${r.label}</div><div class="msg">${r.message}</div></div>`).join("")
-    : `<div class="reminder"><div class="msg">여행 날짜 정보가 없어 알림을 만들지 못했어요.</div></div>`;
-  show("done");
-}
-$("#btnDoneHome").onclick = goHome;
-
-/* ── FR-15: 내 예매 확인 ──────────────────── */
-async function refreshHomeCard() {
-  const box = $("#homeHoldCard");
-  box.innerHTML = "";
+    <div class="kv"><span>가는 날</span><b>${sim.journey.legs[0].fromName} → ${j.legs[j.legs.length - 1].toName}</b></div>
+    <div class="kv"><span>출발</span><b>${fmt(j.dep)}</b></div>
+    <div class="kv"><span>도착</span><b>${fmt(j.arr)}</b></div>
+    <div class="kv"><span>데모 번호</span><b>${sim.demoId}</b></div>`;
+  $("#doneRem").innerHTML = sim.reminders.map((r) =>
+    `<div class="rem"><div class="when">${r.label}</div><div class="msg">${r.subject}</div></div>`).join("")
+    || `<div class="rem"><div class="msg">알림을 만들지 못했어요.</div></div>`;
+  show("s-done");
+};
+$("#bNotify").onclick = async () => {
   try {
-    const r = await api(`/holds?sessionId=${SID}`);
-    const held = r.holds.find((h) => h.status === "held");
-    const paid = r.holds.find((h) => h.status === "paid");
-    if (held) {
-      const mins = Math.max(1, Math.floor(held.remainingSec / 60));
-      box.innerHTML = `<div class="card active-hold"><b>결제를 기다리는 표가 있어요</b><br>
-        <span class="cnt">${mins}분 남았어요</span> — 눌러서 확인하세요</div>`;
-      box.querySelector(".active-hold").onclick = () => { currentHold = held; renderHold(held); };
-    } else if (paid) {
-      box.innerHTML = `<div class="card active-hold"><b>다가오는 여행이 있어요</b><br>
-        ${paid.journey.legs[0]["from"]} → ${paid.journey.legs[paid.journey.legs.length - 1].to} — 눌러서 확인하세요</div>`;
-      box.querySelector(".active-hold").onclick = () => { currentHold = paid; renderDone(paid); };
-    }
+    const r = await api(`/notify/${sim.demoId}/demo`, { method: "POST", body: "{}" });
+    toast(r.sent ? `${r.to} 로 보냈어요.` : `메일 설정이 없어 못 보냈어요: ${r.error}`);
+  } catch (e) { toast(e.message); }
+};
+
+/* ── 홈: 진행 중 시뮬레이션 (FR-11) ── */
+async function refreshHome() {
+  try {
+    const r = await api(`/sim?sessionId=${SID}`);
+    const act = r.reservations.find((x) => ["SIM_HELD", "MOCK_PAYMENT_OPENED"].includes(x.status));
+    const box = $("#homeSim");
+    if (act) {
+      const min = Math.max(1, Math.floor(act.remainingSec / 60));
+      box.innerHTML = `<div class="card" style="border:2px solid var(--sim-line);background:var(--sim-bg);cursor:pointer">
+        <span class="badge b-sim">시뮬레이션</span>
+        <b style="display:block;margin-top:4px">예약 시뮬레이션이 진행 중이에요</b>
+        <span style="color:var(--danger);font-weight:800">${min}분 남았어요</span> — 눌러서 이어가기</div>`;
+      box.firstElementChild.onclick = () => { sim = act; renderHold(); };
+    } else box.innerHTML = "";
+    const saved = await api(`/input/${SID}`);
+    $("#bResume").style.display = saved.lines.length ? "block" : "none";
   } catch (e) { /* 홈 카드는 조용히 생략 */ }
 }
 
-function goHome() {
-  clearInterval(countTimer);
-  refreshHomeCard();
-  show("home");
-}
-
-/* ── FR-1: 음성 입력 (Web Speech API) ─────── */
-function setupMic(btnId, inputId) {
-  const btn = $(btnId);
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { btn.style.display = "none"; return; }
-  const rec = new SR();
-  rec.lang = "ko-KR";
-  rec.interimResults = false;
-  let listening = false;
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    $(inputId).value = text;
-    sendText(text);
-  };
-  rec.onend = () => { listening = false; btn.classList.remove("listening"); };
-  rec.onerror = () => toast("잘 못 들었어요. 다시 한 번 말씀해 주세요.");
-  btn.onclick = () => {
-    if (listening) { rec.stop(); return; }
-    listening = true;
-    btn.classList.add("listening");
-    rec.start();
-    toast("듣고 있어요. 말씀하세요.");
-  };
-}
-
-/* ── 개발 로그 (SSE) — 패널을 열 때만 연결한다 ── */
-(function devlog() {
-  const box = $("#devlog");
-  let es = null;
-  $("#btnLog").onclick = () => {
-    const open = box.classList.toggle("open");
-    if (open && !es) {
-      es = new EventSource(`/api/stream/${SID}`);
-      es.onmessage = (e) => {
-        const ev = JSON.parse(e.data);
-        box.textContent += `[${ev.tag}] ${ev.msg}\n`;
-        box.scrollTop = box.scrollHeight;
-      };
-    } else if (!open && es) {
-      es.close();
-      es = null;
-    }
-  };
-})();
-
-/* ── 바인딩 ───────────────────────────────── */
-$("#send").onclick = () => { sendText($("#txt").value); $("#txt").value = ""; };
-$("#txt").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#send").click(); });
-$("#sendAsk").onclick = () => { sendText($("#txtAsk").value); $("#txtAsk").value = ""; };
-$("#txtAsk").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#sendAsk").click(); });
-document.querySelectorAll(".chip[data-say]").forEach((c) => (c.onclick = () => sendText(c.dataset.say)));
-$("#btnHome").onclick = goHome;
-$("#askReset").onclick = async () => {
-  try { await api(`/dialog/${SID}/reset`, { method: "POST", body: "{}" }); } catch (e) {}
-  lastSlots = null;
-  goHome();
+/* ── 바인딩 ─────────────────────── */
+$("#bStart").onclick = () => { input = { passengers: { senior: 0, adult: 0, student: 0 } }; step(1); loadNearest(); };
+$("#bResume").onclick = async () => {
+  const r = await api(`/input/${SID}`);
+  input = { ...input, ...r.input };
+  if (r.ready) renderSummary(); else step(1);
 };
-$("#btnBigger").onclick = () => {
+$("#n1").onclick = () => step(2);
+$("#n2").onclick = () => { renderQuick(); renderCal(); step(3); };
+$("#n3").onclick = () => step(4);
+$("#n4").onclick = () => { renderPax(); step(5); };
+$("#n5").onclick = () => renderSummary();
+$("#bSearch").onclick = () => doSearch();
+$("#bBackSum").onclick = () => renderSummary();
+$("#bBig").onclick = () => {
   const on = document.documentElement.classList.toggle("bigger");
-  $("#btnBigger").setAttribute("aria-pressed", String(on));
+  $("#bBig").setAttribute("aria-pressed", String(on));
 };
-setupMic("#mic", "#txt");
-setupMic("#micAsk", "#txtAsk");
+$("#bReset").onclick = async () => {
+  if (!confirm("입력값과 시뮬레이션 예약을 모두 지울까요?")) return;
+  await api(`/demo/${SID}/reset`, { method: "POST", body: "{}" });
+  input = { passengers: { senior: 0, adult: 0, student: 0 } };
+  sim = null; clearInterval(cdTimer);
+  toast("처음 상태로 되돌렸어요."); goHome();
+};
 
-refreshHomeCard();
-// 시연용: ?demo 는 기본 시나리오 자동 재생, ?say=<문장> 은 임의 발화로 시작
-const SAY = new URLSearchParams(location.search).get("say");
-if (SAY) setTimeout(() => sendText(SAY), 500);
-else if (DEMO) setTimeout(() => sendText("내일 아침에 서울에서 부산 가려고, 어른 두 명"), 700);
+initTime();
+refreshHome();
+
+/* 시연·검증용: ?step=N 으로 특정 단계, ?fill 로 예시 입력 채우기, ?go 로 결과까지 */
+(async function demoParams() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("step") && !q.has("fill") && !q.has("go")) return;
+  if (q.has("fill") || q.has("go") || q.has("step")) {
+    const sample = [
+      ["departure", { departure: { name: "서울", type: "station", canonicalId: "SEOUL" } }],
+      ["arrival", { arrival: { name: "부산", type: "station", canonicalId: "BUSAN" } }],
+      ["date", { date: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10) }],
+      ["arrivalTime", { arrivalTime: 720 }],
+      ["passengers", { passengers: { senior: 1, adult: 1, student: 0 } }],
+    ];
+    const upto = q.has("step") ? Math.max(0, +q.get("step") - 1) : 5;
+    for (let i = 0; i < upto; i++) {
+      const [st, inp] = sample[i];
+      await api("/input/validate", { method: "POST", body: JSON.stringify({ sessionId: SID, step: st, input: inp }) });
+      Object.assign(input, inp);
+    }
+  }
+  if (q.has("go")) { await renderSummary(); doSearch(); return; }
+  if (q.has("step")) {
+    const n = +q.get("step");
+    if (n === 3) { renderQuick(); renderCal(); }
+    if (n === 5) renderPax();
+    if (n === 6) { renderSummary(); return; }
+    step(n);
+    if (n === 1) loadNearest();
+  }
+})();
 </script>
 </body>
 </html>

@@ -30,6 +30,10 @@ class Settings:
     tago_api_key: str = os.environ.get("TAGO_API_KEY", "")
     odsay_api_key: str = os.environ.get("ODSAY_API_KEY", "")
 
+    # TOOL_MODE=live에서 TAGO 조회가 실패하면 시뮬레이션으로 전환할지 (기본 false).
+    # true여도 조용히 넘어가지 않는다 — provenance가 SIMULATED로 바뀌고 카드에 전환 사실이 표시된다 (§2).
+    schedule_fallback_mock: bool = field(default_factory=lambda: _bool("SCHEDULE_FALLBACK_MOCK", False))
+
     # 열차 좌석 **조회 전용** 계정 (VER3 §2: 예약 함수 호출 금지, 로그·클라이언트 노출 금지)
     korail_id: str = os.environ.get("KORAIL_ID", "")
     korail_pw: str = os.environ.get("KORAIL_PW", "")
