@@ -26,6 +26,23 @@ class Settings:
     tool_mode: str = os.environ.get("TOOL_MODE", "mock")
     kskill_bin: str = os.environ.get("KSKILL_BIN", "k-skill")
 
+    # 외부 API 키 (운행정보·요금 — TAGO/ODsay)
+    tago_api_key: str = os.environ.get("TAGO_API_KEY", "")
+    odsay_api_key: str = os.environ.get("ODSAY_API_KEY", "")
+
+    # 열차 좌석 **조회 전용** 계정 (VER3 §2: 예약 함수 호출 금지, 로그·클라이언트 노출 금지)
+    korail_id: str = os.environ.get("KORAIL_ID", "")
+    korail_pw: str = os.environ.get("KORAIL_PW", "")
+    srt_id: str = os.environ.get("SRT_ID", "")
+    srt_pw: str = os.environ.get("SRT_PW", "")
+
+    # 데모 이메일 알림 (FR-10) — 사용자 이메일 입력 없음, 서버에 미리 등록된 주소로만 전송
+    demo_email_to: str = os.environ.get("DEMO_EMAIL_TO", "")
+    smtp_host: str = os.environ.get("SMTP_HOST", "")
+    smtp_port: int = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user: str = os.environ.get("SMTP_USER", "")
+    smtp_pass: str = os.environ.get("SMTP_PASS", "")
+
     # SQLite (WAL)
     db_path: str = os.environ.get("BAROTA_DB", str(Path(__file__).resolve().parent.parent / "barota.db"))
 

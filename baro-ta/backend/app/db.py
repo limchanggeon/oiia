@@ -60,6 +60,36 @@ def init_db() -> None:
             last_target_slot TEXT,
             updated_at REAL NOT NULL
         );
+        -- ── VER3 ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS trip_inputs(
+            session_id TEXT PRIMARY KEY,
+            input_json TEXT NOT NULL,      -- TripInput (5단계 입력값)
+            updated_at REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sim_reservations(
+            demo_id TEXT PRIMARY KEY,      -- DEMO-XXXXXX (사업자 예약번호 아님)
+            session_id TEXT,
+            journey_json TEXT NOT NULL,
+            seats_json TEXT NOT NULL,
+            passengers_json TEXT NOT NULL,
+            fare_json TEXT NOT NULL,
+            date_iso TEXT,
+            status TEXT NOT NULL,          -- SIM_* / MOCK_PAYMENT_OPENED / DEMO_COMPLETED
+            deadline REAL,
+            created_at REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS demo_notifications(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            demo_id TEXT NOT NULL,
+            session_id TEXT,
+            at_iso TEXT NOT NULL,
+            label TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            sent INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS holds(
             id TEXT PRIMARY KEY,
             session_id TEXT,
@@ -239,6 +269,112 @@ def hold_set_status(hold_id: str, status: str) -> None:
     with _lock:
         _c().execute("UPDATE holds SET status=? WHERE id=?", (status, hold_id))
         _c().commit()
+
+
+# ── VER3: 단계형 입력 세션 (FR-1/2/3) ──────────────
+def input_get(session_id: str) -> Dict[str, Any]:
+    row = _c().execute("SELECT input_json FROM trip_inputs WHERE session_id=?", (session_id,)).fetchone()
+    return json.loads(row[0]) if row else {}
+
+
+def input_save(session_id: str, data: Dict[str, Any]) -> None:
+    with _lock:
+        _c().execute(
+            "INSERT OR REPLACE INTO trip_inputs(session_id, input_json, updated_at) VALUES(?,?,?)",
+            (session_id, json.dumps(data, ensure_ascii=False), time.time()),
+        )
+        _c().commit()
+
+
+# ── VER3: 시뮬레이션 예약 (FR-9/11) ─────────────────
+def sim_create(demo_id: str, session_id: Optional[str], journey: Dict[str, Any], seats: Any,
+               passengers: Dict[str, Any], fare: Dict[str, Any], date_iso: Optional[str],
+               status: str, deadline: Optional[float]) -> None:
+    with _lock:
+        _c().execute(
+            "INSERT INTO sim_reservations(demo_id, session_id, journey_json, seats_json, passengers_json,"
+            " fare_json, date_iso, status, deadline, created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (demo_id, session_id or "public", json.dumps(journey, ensure_ascii=False),
+             json.dumps(seats, ensure_ascii=False), json.dumps(passengers, ensure_ascii=False),
+             json.dumps(fare, ensure_ascii=False), date_iso, status, deadline, time.time()),
+        )
+        _c().commit()
+
+
+_SIM_COLS = ("demo_id, session_id, journey_json, seats_json, passengers_json, fare_json,"
+             " date_iso, status, deadline")
+
+
+def _sim_row(row) -> Dict[str, Any]:
+    status, deadline = row[7], row[8]
+    # 기한 경과 시 자동 만료 (FR-9 SIM_EXPIRED) — lazy 판정
+    if status in ("SIM_HELD", "MOCK_PAYMENT_OPENED") and deadline and deadline < time.time():
+        status = "SIM_EXPIRED"
+    return {
+        "demoId": row[0], "sessionId": row[1], "journey": json.loads(row[2]),
+        "seats": json.loads(row[3]), "passengers": json.loads(row[4]), "fare": json.loads(row[5]),
+        "dateIso": row[6], "status": status, "deadline": deadline,
+    }
+
+
+def sim_get(demo_id: str) -> Optional[Dict[str, Any]]:
+    row = _c().execute(f"SELECT {_SIM_COLS} FROM sim_reservations WHERE demo_id=?", (demo_id,)).fetchone()
+    return _sim_row(row) if row else None
+
+
+def sim_list(session_id: Optional[str] = None) -> list:
+    if session_id:
+        rows = _c().execute(
+            f"SELECT {_SIM_COLS} FROM sim_reservations WHERE session_id=? ORDER BY created_at DESC",
+            (session_id,),
+        ).fetchall()
+    else:
+        rows = _c().execute(f"SELECT {_SIM_COLS} FROM sim_reservations ORDER BY created_at DESC").fetchall()
+    return [_sim_row(r) for r in rows]
+
+
+def sim_set_status(demo_id: str, status: str) -> None:
+    with _lock:
+        _c().execute("UPDATE sim_reservations SET status=? WHERE demo_id=?", (status, demo_id))
+        _c().commit()
+
+
+# ── VER3: 데모 알림 큐 (FR-10) ─────────────────────
+def notify_add(demo_id: str, session_id: Optional[str], reminders: list) -> None:
+    with _lock:
+        for r in reminders:
+            _c().execute(
+                "INSERT INTO demo_notifications(demo_id, session_id, at_iso, label, subject, body, sent, created_at)"
+                " VALUES(?,?,?,?,?,?,0,?)",
+                (demo_id, session_id or "public", r["atIso"], r["label"], r["subject"], r["body"], time.time()),
+            )
+        _c().commit()
+
+
+def notify_list(demo_id: str) -> list:
+    rows = _c().execute(
+        "SELECT id, at_iso, label, subject, body, sent FROM demo_notifications WHERE demo_id=? ORDER BY at_iso",
+        (demo_id,),
+    ).fetchall()
+    return [{"id": r[0], "atIso": r[1], "label": r[2], "subject": r[3], "body": r[4], "sent": bool(r[5])}
+            for r in rows]
+
+
+def notify_mark_sent(notif_id: int) -> None:
+    with _lock:
+        _c().execute("UPDATE demo_notifications SET sent=1 WHERE id=?", (notif_id,))
+        _c().commit()
+
+
+def demo_reset(session_id: str) -> None:
+    """[데모 초기화] — 입력값·시뮬레이션 예약·서버 알림 예약을 한 번에 삭제 (§5-7)."""
+    with _lock:
+        c = _c()
+        c.execute("DELETE FROM trip_inputs WHERE session_id=?", (session_id,))
+        c.execute("DELETE FROM sim_reservations WHERE session_id=?", (session_id,))
+        c.execute("DELETE FROM demo_notifications WHERE session_id=?", (session_id,))
+        c.execute("DELETE FROM dialog_sessions WHERE id=?", (session_id,))
+        c.commit()
 
 
 # ── 감사 로그 (승인 게이트) ────────────────────────

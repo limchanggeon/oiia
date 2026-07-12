@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from . import db
 from .api import router
 from .api_v2 import router as router_v2
+from .api_v3 import router as router_v3
 from .config import settings
 
 
@@ -38,8 +39,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api")          # 데모 계약 (기존 React 클라이언트)
-app.include_router(router_v2, prefix="/api/v2")    # 기능 명세서 계약 (FR-2~FR-15)
+app.include_router(router, prefix="/api")          # 레거시 데모 (기존 React 클라이언트)
+app.include_router(router_v2, prefix="/api/v2")    # 구 명세서 계약
+app.include_router(router_v3, prefix="/api/v3")    # 기능 명세서 VER3 (현행)
 
 # 시니어 UI 레퍼런스 클라이언트 (기능 명세서 프론트 — Next.js 본 구현의 참고용)
 app.mount("/app", StaticFiles(directory=str(Path(__file__).resolve().parent.parent / "static"), html=True), name="app")

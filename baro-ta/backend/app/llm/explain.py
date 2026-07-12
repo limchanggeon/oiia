@@ -3,7 +3,8 @@
 실패하면 호출 측이 결정적 설명문(core/explain.py)을 유지한다.
 """
 import json
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional
 
 from ..config import settings
 from .base import build_output_config
@@ -26,15 +27,37 @@ EXPLAIN_SYSTEM_PROMPT = (
     "설명문을 한 문장씩 만듭니다.\n"
     "- 30자 이내, 쉬운 말, 과장 금지. 예: '갈아타지 않는 제일 빠른 차예요.'\n"
     "- 다른 경로와 비교되는 장점(빠름/저렴/직통/환승)을 하나만 골라 말합니다.\n"
-    "- 입력 배열과 같은 순서·같은 개수로 출력합니다."
+    "- 입력 배열과 같은 순서·같은 개수로 출력합니다.\n"
+    "\n[절대 금지 — 위반 시 문장이 폐기됩니다]\n"
+    "1. 숫자를 쓰지 마세요. 시각·소요시간·요금·분·원·호차는 이미 카드에 표시되므로 "
+    "문장에 넣지 않습니다. ('10분 빠르고' ×, '3만원대' ×, '더 빨라요' ○)\n"
+    "2. 주어진 시간·요금·좌석 상태를 바꾸거나 새로 계산하지 않습니다.\n"
+    "3. 좌석 유무·매진 여부를 판단하거나 언급하지 않습니다.\n"
+    "당신은 확정된 데이터를 '비교해서 말로 옮기는' 역할만 합니다."
 )
+
+# 숫자·단위가 섞이면 LLM이 값을 지어낸 것으로 보고 폐기한다 (FR-8, §4)
+_FORBIDDEN = re.compile(r"[0-9]|분\s|원|시간|호차|퍼센트|%")
 
 
 def _fmt(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
-async def explain_anthropic(journeys: List[Dict[str, Any]]) -> List[str]:
+def sanitize(text: str, fallback: str) -> str:
+    """LLM이 숫자를 지어냈으면 폐기하고 정형 문구로 대체한다 (FR-8, §4).
+
+    LLM은 시간·요금을 '변경하거나 새로 만들' 수 없다. 문장에 숫자·단위가 섞였다는 건
+    카드의 확정값과 어긋난 값을 만들어냈을 가능성이 있다는 뜻이므로, 검증 없이 쓰지 않는다.
+    (실제로 '10분 빠르고'처럼 실제 차이(5분)와 다른 수치를 생성한 사례가 있었다.)
+    """
+    t = (text or "").strip()
+    if not t or _FORBIDDEN.search(t):
+        return fallback
+    return t
+
+
+async def explain_anthropic(journeys: List[Dict[str, Any]], fallbacks: Optional[List[str]] = None) -> List[str]:
     from .anthropic_parser import _get_client
 
     brief = [
@@ -59,4 +82,6 @@ async def explain_anthropic(journeys: List[Dict[str, Any]]) -> List[str]:
     explanations = json.loads(raw_text)["explanations"]
     if len(explanations) != len(journeys):
         raise ValueError("설명문 개수 불일치")
-    return [str(e).strip() for e in explanations]
+
+    fbs = fallbacks or [""] * len(journeys)
+    return [sanitize(str(e), fb) for e, fb in zip(explanations, fbs)]
