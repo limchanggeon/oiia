@@ -163,6 +163,15 @@ async def search(
     if fell_back:
         log.append(("SEARCH", f"운행정보 실조회 실패 → 시뮬레이션 전환(카드에 표시): {', '.join(fell_back)}"))
 
+    # 당일 검색: 이미 출발한 편은 탈 수 없다 (여유 10분 미만 포함)
+    if date_iso == dt.date.today().isoformat():
+        now = dt.datetime.now()
+        now_min = now.hour * 60 + now.minute
+        before = len(candidates)
+        candidates = [c for c in candidates if c["leg"]["dep"] > now_min + 10]
+        if before != len(candidates):
+            log.append(("SEARCH", f"이미 출발한 편 {before - len(candidates)}건 제외 (당일 검색)"))
+
     if not candidates:
         return {"journeys": [], "unknown": [], "excluded_sold_out": 0,
                 "excluded_sources": excluded_sources, "recombined": False, "log": log}
@@ -196,6 +205,9 @@ async def search(
     available = [j for j in journeys
                  if j["seatStatus"] in {s.value for s in AVAILABLE_STATUSES} and j["onTime"]]
 
+    # 마감 시각을 넘는 확인불가 편은 어차피 탈 수 없으므로 노이즈 제거
+    unknown = [j for j in unknown if j["onTime"]]
+
     log.append(("SEAT", f"좌석 판정 — 가능 {len(available)} · 매진 {len(sold_out)} · 확인불가 {len(unknown)}"))
 
     # ── FR-7: 전 후보 매진이면 재조합 ──
@@ -203,7 +215,7 @@ async def search(
     if not available and sold_out:
         fastest = min(j["durationMin"] for j in journeys)
         alt = await _recombine(origin_id, dest_id, date_iso, arrive_by, passengers,
-                               fastest, sold_out_all, seat_lookup_fail)
+                               fastest, seat_lookup_fail)
         if alt:
             available = alt
             recombined = True
@@ -228,8 +240,7 @@ async def search(
 
 async def _recombine(
     origin_id: str, dest_id: str, date_iso: str, arrive_by: int,
-    passengers: Dict[str, int], fastest_direct: int,
-    sold_out_all: bool, seat_fail: bool,
+    passengers: Dict[str, int], fastest_direct: int, seat_fail: bool,
 ) -> List[Dict[str, Any]]:
     """FR-7 — 허브 경유 환승 조합 탐색.
 

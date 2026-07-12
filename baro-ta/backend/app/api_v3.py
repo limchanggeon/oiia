@@ -3,11 +3,11 @@ import datetime as dt
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from . import db
 from .config import settings
-from .core import fares, notify, places, simulation
+from .core import fares, gate, notify, places, simulation
 from .core.search import search as run_search
 from .events import broker
 from .schemas import AgentLine
@@ -75,14 +75,19 @@ def _validate(step: str, data: Dict[str, Any]) -> tuple[bool, str]:
     if step == "date":
         if not data.get("date"):
             return False, "날짜를 고르면 다음으로 갈 수 있어요"
-        if dt.date.fromisoformat(data["date"]) < dt.date.today():
+        try:
+            picked = dt.date.fromisoformat(data["date"])
+        except ValueError:
+            # 잘못된 형식("2026-13-99")이 500을 내지 않도록 방어
+            return False, "날짜 형식이 올바르지 않아요. 달력에서 다시 골라 주세요"
+        if picked < dt.date.today():
             return False, "지난 날짜는 고를 수 없어요"
         return True, ""
     if step == "arrivalTime":
         t = data.get("arrivalTime")
         if t is None:
             return False, "몇 시까지 도착할지 고르면 다음으로 갈 수 있어요"
-        if t % 5 != 0:
+        if not (0 <= t <= 1435) or t % 5 != 0:
             return False, "시간은 5분 단위로 골라 주세요"
         # 당일이면 이미 지난 시각 금지 (FR-2)
         if data.get("date") == dt.date.today().isoformat():
@@ -300,22 +305,36 @@ async def get_sim(demo_id: str) -> SimReservation:
 
 # ── FR-10: 이메일 알림 ─────────────────────────────
 @router.post("/notify/{demo_id}/demo", response_model=NotifyDemoResponse)
-async def notify_demo(demo_id: str) -> NotifyDemoResponse:
-    """[알림 시연] — 실제 알림 시각을 기다리지 않고 즉시 1건 전송 (FR-10 시연 지원)."""
+async def notify_demo(
+    demo_id: str,
+    x_approved_by: Optional[str] = Header(default=None),
+) -> NotifyDemoResponse:
+    """[알림 시연] — 실제 알림 시각을 기다리지 않고 즉시 1건 전송 (FR-10 시연 지원).
+
+    이메일 발송은 시뮬레이션이 아닌 **실제 외부 부작용**이므로 승인 게이트를 거친다.
+    """
     r = db.sim_get(demo_id)
     if r is None:
         raise HTTPException(status_code=404, detail="시뮬레이션 예약을 찾을 수 없어요")
+    try:
+        gate.check("notify.demo", gate.SIDE_EFFECT, r["sessionId"], approved_by=x_approved_by)
+    except gate.ApprovalRequired as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
     pending = db.notify_list(demo_id)
     if not pending:
         raise HTTPException(status_code=409, detail="등록된 알림이 없어요 (데모 완료 후 사용하세요)")
 
     n = next((x for x in pending if not x["sent"]), pending[0])
     result = notify.send(n["subject"], n["body"])
+    cleaned = False
     if result["sent"]:
         db.notify_mark_sent(n["id"])
+        cleaned = db.notify_cleanup(demo_id)   # 마지막 알림 전송 후 데이터 삭제 (FR-10)
 
     agent = [AgentLine(tag="MAIL", msg=f"알림 시연 전송 → {result['to']} · "
-                                       f"{'성공' if result['sent'] else '실패: ' + (result['error'] or '')}")]
+                                       f"{'성공' if result['sent'] else '실패: ' + (result['error'] or '')}"
+                                       f"{' · 알림 데이터 삭제(전송 완료)' if cleaned else ''}")]
     _emit(r["sessionId"], agent)
     return NotifyDemoResponse(
         sent=result["sent"], to=result["to"], subject=n["subject"],

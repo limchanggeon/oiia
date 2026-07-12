@@ -12,7 +12,8 @@ from typing import Any, Dict, List
 
 from ..config import settings
 
-SOURCES = ["KTX", "ITX-새마을", "SRT", "고속버스", "시외버스"]
+# VER3 §1: "KTX·코레일 일반열차·SRT·고속버스·시외버스" — 일반열차는 ITX-새마을·무궁화호
+SOURCES = ["KTX", "ITX-새마을", "무궁화호", "SRT", "고속버스", "시외버스"]
 
 # 서울 기준 대략 소요(분) — 정규화 키(canonicalId) 기준
 _BASE_MIN = {
@@ -23,8 +24,8 @@ _BASE_MIN = {
     "DAEJEON_TERMINAL": 62, "BUSAN_TERMINAL": 165,
 }
 
-_FACTOR = {"KTX": 1.0, "ITX-새마을": 1.55, "SRT": 0.96, "고속버스": 1.85, "시외버스": 2.05}
-_FARE = {"KTX": 38000, "ITX-새마을": 25000, "SRT": 36000, "고속버스": 21000, "시외버스": 18000}
+_FACTOR = {"KTX": 1.0, "ITX-새마을": 1.55, "무궁화호": 2.1, "SRT": 0.96, "고속버스": 1.85, "시외버스": 2.05}
+_FARE = {"KTX": 38000, "ITX-새마을": 25000, "무궁화호": 17000, "SRT": 36000, "고속버스": 21000, "시외버스": 18000}
 
 
 def duration(origin_id: str, dest_id: str, mode: str) -> int:
@@ -78,7 +79,7 @@ def fetch_mock(mode: str, origin_id: str, dest_id: str, arrive_by: int) -> List[
     dur = duration(origin_id, dest_id, mode)
     # 실제 배차 간격에 가깝게 (경부선 KTX 10~30분 등). 간격이 지나치게 넓으면
     # 환승 연결(대기 ≥20분)이 성립하지 않아 재조합이 사실상 불가능해진다.
-    headway = {"KTX": 20, "SRT": 30, "ITX-새마을": 60, "고속버스": 30, "시외버스": 50}[mode]
+    headway = {"KTX": 20, "SRT": 30, "ITX-새마을": 60, "무궁화호": 80, "고속버스": 30, "시외버스": 50}[mode]
     rnd = random.Random(f"{mode}{origin_id}{dest_id}")
     first_dep = 5 * 60 + rnd.randint(0, 5) * 10   # 첫차 05:00~05:50
 
@@ -87,9 +88,10 @@ def fetch_mock(mode: str, origin_id: str, dest_id: str, arrive_by: int) -> List[
     o = places.get(origin_id) or {}
     d = places.get(dest_id) or {}
 
+    # 하루 전체 배차를 생성한다 — 오전 편성만 만들면 당일 오후 검색이 항상 빈 결과가 된다
     legs = []
     dep = first_dep
-    while dep + dur <= arrive_by + 60 and len(legs) < 8:   # 마감 1시간 초과분까지만 생성
+    while dep + dur <= arrive_by + 60 and len(legs) < 48:
         no = f"{mode} {rnd.randint(11, 89)}회" if mode.endswith("버스") else f"{mode} {rnd.randint(101, 899)}"
         legs.append({
             "mode": mode,

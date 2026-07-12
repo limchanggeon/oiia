@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 DISCOUNTS: Dict[str, Dict[str, Optional[float]]] = {
     "KTX": {"senior": 0.3, "student": None},        # 코레일 경로우대 30% (주중 기준), 학생 정기권 외 상시 할인 규칙 미확인
     "ITX-새마을": {"senior": 0.3, "student": None},
+    "무궁화호": {"senior": 0.3, "student": None},
     "SRT": {"senior": 0.3, "student": None},
     "고속버스": {"senior": 0.0, "student": 0.1},     # 고속버스 학생(중고생) 10% — 사업자 공통 규칙
     "시외버스": {"senior": 0.0, "student": 0.2},     # 시외버스 학생(중고생) 20%

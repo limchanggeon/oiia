@@ -3,7 +3,7 @@
 - 사용자 로그인·이메일 입력 없음 — 서버에 미리 등록된 데모 주소(DEMO_EMAIL_TO)로만 전송.
 - 알림 시각: 출발 전날 오후 6시 · 출발 2시간 전 (KST). 이미 2시간 이내면 즉시 1회.
 - 제목·본문에 "경진대회 시연용 알림"을 명시하고, 실제 승차권으로 오인될 표현을 쓰지 않는다.
-- 마지막 알림 전송 후 알림 데이터는 삭제한다 (§FR-10) — db.notify_delete_by_reservation.
+- 마지막 알림 전송 후 알림 데이터는 삭제한다 (§FR-10) — db.notify_cleanup 이 수행.
 """
 import datetime as dt
 import smtplib

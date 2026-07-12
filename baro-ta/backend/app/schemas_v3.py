@@ -68,9 +68,10 @@ class Place(BaseModel):
 
 # ── 승객 구성 (FR-1 ⑤, FR-2) ───────────────────────
 class PassengerCounts(BaseModel):
-    senior: int = 0    # 노약자 = 만 65세 이상
-    adult: int = 0
-    student: int = 0
+    # 음수 인원이 합계 검증을 통과하는 것을 스키마 수준에서 차단 (senior=-1, adult=2 → total=1)
+    senior: int = Field(0, ge=0, le=9)    # 노약자 = 만 65세 이상
+    adult: int = Field(0, ge=0, le=9)
+    student: int = Field(0, ge=0, le=9)
 
 
 class PassengerCountsOut(PassengerCounts):
@@ -95,7 +96,7 @@ class TripInput(BaseModel):
     departure: Optional[Place] = None
     arrival: Optional[Place] = None
     date: Optional[str] = None          # YYYY-MM-DD
-    arrivalTime: Optional[int] = None   # 도착 마감 시각 (자정 기준 분, 5분 단위)
+    arrivalTime: Optional[int] = Field(None, ge=0, le=1435)  # 도착 마감 시각 (자정 기준 분, 5분 단위)
     passengers: PassengerCounts = PassengerCounts()
 
 

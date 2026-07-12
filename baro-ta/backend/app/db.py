@@ -366,6 +366,21 @@ def notify_mark_sent(notif_id: int) -> None:
         _c().commit()
 
 
+def notify_cleanup(demo_id: str) -> bool:
+    """모든 알림이 전송됐으면 해당 데모의 알림 데이터를 삭제한다 (FR-10:
+    '서버의 데모 알림 데이터는 마지막 알림 전송 후 삭제한다'). 삭제 시 True."""
+    with _lock:
+        c = _c()
+        row = c.execute(
+            "SELECT COUNT(*) FROM demo_notifications WHERE demo_id=? AND sent=0", (demo_id,)
+        ).fetchone()
+        if row and row[0] == 0:
+            c.execute("DELETE FROM demo_notifications WHERE demo_id=?", (demo_id,))
+            c.commit()
+            return True
+    return False
+
+
 def demo_reset(session_id: str) -> None:
     """[데모 초기화] — 입력값·시뮬레이션 예약·서버 알림 예약을 한 번에 삭제 (§5-7)."""
     with _lock:

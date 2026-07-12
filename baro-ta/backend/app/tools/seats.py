@@ -116,6 +116,12 @@ async def lookup(
         if not fut.done():
             fut.set_result(result)
         return result
+    except BaseException as e:
+        # 최초 조회가 취소/예외로 죽으면 대기자도 함께 풀어준다 — 미해결 future에
+        # 붙어 있던 요청이 영원히 매달리는 것을 방지
+        if not fut.done():
+            fut.set_exception(e)
+        raise
     finally:
         _inflight.pop(key, None)
 
