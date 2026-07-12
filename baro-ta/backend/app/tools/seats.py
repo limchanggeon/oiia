@@ -1,34 +1,46 @@
 """좌석 상태 조회 어댑터 (FR-6) — 열차는 실시간 조회, 버스는 시뮬레이션.
 
 VER3 §2 시연 안전 규칙을 코드로 강제한다:
-- korail2·SRTrain의 **예약 함수는 호출하지 않는다** — 이 모듈은 조회 함수만 노출한다.
-  reserve/cancel에 해당하는 진입점 자체가 없으며, 시도 시 ReservationDisabled를 던진다.
-- 동일 조건 좌석 조회는 짧은 시간 캐시하고 중복 호출을 합친다 (in-flight 병합).
+- korail2·SRTrain의 **예약 함수는 호출하지 않는다** — 이 모듈은 조회만 노출한다.
+  reserve()는 항상 ReservationDisabled를 던지는 차단 스텁이며, subprocess로 실행하는
+  py/seat_lookup.py 에도 예약 계열 호출이 없다.
+- 동일 구간 조회는 짧은 시간 캐시하고 중복 호출을 합친다 (구간 단위 조회 + in-flight 병합).
 - 동시 호출 수와 재시도 횟수를 제한한다. 무한 재시도 금지.
 - 조회 실패는 UNKNOWN으로 반환한다 — **매진으로 변환하지 않는다** (§5-4).
 """
 import asyncio
+import json
+import os
 import random
+import re
+import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from ..config import settings
 
-SEAT_CACHE_TTL = 30          # 초 — 동일 조건 재조회 억제 (§2 안전 규칙)
-MAX_CONCURRENCY = 4          # 동시 좌석 조회 수 제한
-MAX_RETRIES = 1              # 재시도 1회까지만 (무한 재시도 금지)
-LOOKUP_TIMEOUT = 6.0         # 초
+SEAT_CACHE_TTL = 60          # 초 — 동일 구간 재조회 억제 (§2). 명세 "60초 hold"
+MAX_CONCURRENCY = 3          # 동시 좌석 조회(외부 호출) 수 제한
+MAX_RETRIES = 1              # 재시도 1회까지 (무한 재시도 금지)
+LOOKUP_TIMEOUT = 20.0        # 초 — subprocess 전체
 
-TRAIN_MODES = {"KTX", "ITX-새마을", "SRT"}
+TRAIN_MODES = {"KTX", "ITX-새마을", "무궁화호", "SRT"}
 BUS_MODES = {"고속버스", "시외버스"}
 
+KORAIL_MODES = {"KTX", "ITX-새마을", "무궁화호"}   # 코레일 조회 대상
+SRT_MODES = {"SRT"}
+
+_SCRIPT = Path(__file__).resolve().parent.parent.parent / "py" / "seat_lookup.py"
+
 _sem = asyncio.Semaphore(MAX_CONCURRENCY)
-_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_cache: Dict[str, Tuple[float, Dict[str, bool]]] = {}     # 구간키 → (만료, {편명키: soldOut})
 _inflight: Dict[str, asyncio.Future] = {}
 
 
 class ReservationDisabled(RuntimeError):
-    """예약·선점 함수 호출 차단 (§2, §5-6). 대회 버전에서 실제 예약은 존재하지 않는다."""
+    """예약·선점 함수 호출 차단 (§2, §5-6). 대회 버전에 실제 예약은 존재하지 않는다."""
 
 
 def reserve(*_args, **_kwargs):
@@ -39,22 +51,69 @@ def reserve(*_args, **_kwargs):
     )
 
 
-def _key(mode: str, no: str, date_iso: str) -> str:
-    return f"seat:{mode}:{no}:{date_iso}"
+def train_key(mode: str, no: str) -> str:
+    """편명 매칭 키 — 열차번호 자릿수 표기가 소스마다 달라(075 vs 75) 숫자만 뽑아 비교한다."""
+    digits = re.sub(r"\D", "", no or "")
+    return f"{mode}:{int(digits)}" if digits else f"{mode}:{no}"
 
 
-def _lookup_live_train(mode: str, no: str, date_iso: str, dep: int) -> bool:
-    """[실연동 교체 지점] korail2 / SRTrain **조회 전용** 호출.
+def _run_lookup(provider: str, dep_name: str, arr_name: str, ymd: str, hhmmss: str) -> list:
+    env = {**os.environ, "SRT_ID": settings.srt_id, "SRT_PW": settings.srt_pw}
+    proc = subprocess.run(
+        [sys.executable, str(_SCRIPT), provider, dep_name, arr_name, ymd, hhmmss],
+        capture_output=True, text=True, timeout=LOOKUP_TIMEOUT, env=env,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"{provider} 좌석 조회 실패: {proc.stderr.strip()[:120]}")
+    return json.loads(proc.stdout)
 
-    korail2: Korail(id, pw).search_train(...) → 좌석 유무만 읽는다.
-    SRTrain: SRT(id, pw).search_train(...) → 동일.
-    ※ reserve()는 절대 호출하지 않는다 (§2).
 
-    반환: 좌석 있음 여부. 실패 시 예외 → 호출 측에서 UNKNOWN 처리.
+async def fetch_route_rows(provider: str, dep_name: str, arr_name: str, date_iso: str) -> list:
+    """구간의 열차 목록(시간표+요금+좌석)을 한 번 조회해 캐시한다.
+
+    schedule.py(시간표)와 seats.py(좌석)가 **같은 캐시를 공유**하므로
+    한 구간당 외부 호출은 1회로 합쳐진다 (§2 중복 호출 억제).
     """
-    if not (settings.korail_id and settings.korail_pw):
-        raise RuntimeError("코레일 계정 미설정 — 좌석 실시간 조회 불가")
-    raise RuntimeError("korail2/SRTrain 실연동 미구성")
+    key = f"rail:{provider}:{dep_name}:{arr_name}:{date_iso}"
+
+    hit = _cache.get(key)
+    if hit and hit[0] > time.time():
+        return hit[1]
+    if key in _inflight:
+        return await _inflight[key]              # 중복 호출 합치기 (§2)
+
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future = loop.create_future()
+    _inflight[key] = fut
+    try:
+        ymd = date_iso.replace("-", "")
+        async with _sem:                          # 동시 호출 제한 (§2)
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    rows = await asyncio.to_thread(_run_lookup, provider, dep_name, arr_name, ymd, "000000")
+                    break
+                except Exception:                 # noqa: BLE001
+                    if attempt >= MAX_RETRIES:
+                        raise                     # 재시도 상한 (무한 재시도 금지)
+                    await asyncio.sleep(0.5)
+
+        _cache[key] = (time.time() + SEAT_CACHE_TTL, rows)
+        if not fut.done():
+            fut.set_result(rows)
+        return rows
+    except BaseException as e:
+        # 최초 조회가 실패하면 대기자도 함께 풀어준다 (무한 대기 방지)
+        if not fut.done():
+            fut.set_exception(e)
+        raise
+    finally:
+        _inflight.pop(key, None)
+
+
+async def _lookup_route(provider: str, dep_name: str, arr_name: str, date_iso: str) -> Dict[str, bool]:
+    """구간의 {편명키: soldOut} 맵 (fetch_route_rows 캐시 재사용)."""
+    rows = await fetch_route_rows(provider, dep_name, arr_name, date_iso)
+    return {train_key(r["mode"], r["no"]): bool(r["soldOut"]) for r in rows}
 
 
 def _simulate_seat(mode: str, no: str, date_iso: str, sold_out: bool) -> Dict[str, Any]:
@@ -70,84 +129,53 @@ def _simulate_seat(mode: str, no: str, date_iso: str, sold_out: bool) -> Dict[st
 
 
 async def lookup(
-    mode: str,
-    no: str,
+    leg: Dict[str, Any],
     date_iso: str,
-    dep: int,
     *,
     force_sold_out: bool = False,
     force_fail: bool = False,
 ) -> Dict[str, Any]:
-    """좌석 상태 조회. 반환: {status: SeatStatus, mode: DataMode, checkedAt}
+    """구간(leg)의 좌석 상태. 반환: {status: SeatStatus, mode: DataMode, checkedAt}
 
-    - 열차: 실시간 조회 시도 → 실패 시 UNKNOWN (매진 아님)
+    - 열차: korail2/SRTrain 실시간 조회 → 실패 시 UNKNOWN (매진 아님, §5-4)
     - 버스: 시뮬레이션 (명세상 좌석 실조회 불가)
     """
     checked_at = time.strftime("%Y-%m-%dT%H:%M:%S")
+    mode, no = leg["mode"], leg["no"]
 
     if force_fail:
         return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
 
-    # 버스: 시뮬레이션 전용 (FR-6)
-    if mode in BUS_MODES:
-        r = _simulate_seat(mode, no, date_iso, force_sold_out)
-        return {**r, "checkedAt": checked_at}
-
-    # 시뮬레이션 강제(매진 시연 등)는 캐시를 우회한다 —
-    # 캐시된 실조회/이전 시뮬 결과가 시연 옵션을 덮어써 재조합이 안 걸리는 버그가 있었다.
+    # 시뮬레이션 강제(매진 시연)는 캐시·실조회를 우회한다
     if force_sold_out:
         return {**_simulate_seat(mode, no, date_iso, True), "checkedAt": checked_at}
 
-    # 열차: 캐시 → in-flight 병합 → 실조회
-    key = _key(mode, no, date_iso)
-    hit = _cache.get(key)
-    if hit and hit[0] > time.time():
-        return {**hit[1], "checkedAt": hit[1].get("checkedAt", checked_at)}
+    # 버스: 시뮬레이션 전용 (FR-6, 명세 §1)
+    if mode in BUS_MODES:
+        return {**_simulate_seat(mode, no, date_iso, False), "checkedAt": checked_at}
 
-    if key in _inflight:
-        return await _inflight[key]          # 중복 호출 합치기 (§2)
-
-    loop = asyncio.get_running_loop()
-    fut: asyncio.Future = loop.create_future()
-    _inflight[key] = fut
-    try:
-        result = await _lookup_train_with_policy(mode, no, date_iso, dep, force_sold_out, checked_at)
-        _cache[key] = (time.time() + SEAT_CACHE_TTL, result)
-        if not fut.done():
-            fut.set_result(result)
-        return result
-    except BaseException as e:
-        # 최초 조회가 취소/예외로 죽으면 대기자도 함께 풀어준다 — 미해결 future에
-        # 붙어 있던 요청이 영원히 매달리는 것을 방지
-        if not fut.done():
-            fut.set_exception(e)
-        raise
-    finally:
-        _inflight.pop(key, None)
-
-
-async def _lookup_train_with_policy(
-    mode: str, no: str, date_iso: str, dep: int, force_sold_out: bool, checked_at: str
-) -> Dict[str, Any]:
+    # 시뮬레이션 시간표에는 실제 좌석을 붙이지 않는다 —
+    # 실제값과 목업을 섞으면 출처가 무의미해진다 (§5-1)
     if settings.tool_mode != "live":
-        # 시뮬레이션 모드 — 실조회를 시도하지 않는다 (§5-1: 출처를 명확히 구분)
-        return {**_simulate_seat(mode, no, date_iso, force_sold_out), "checkedAt": checked_at}
+        return {**_simulate_seat(mode, no, date_iso, False), "checkedAt": checked_at}
 
-    async with _sem:                                  # 동시 호출 제한 (§2)
-        for attempt in range(MAX_RETRIES + 1):        # 재시도 상한 (무한 재시도 금지)
-            try:
-                available = await asyncio.wait_for(
-                    asyncio.to_thread(_lookup_live_train, mode, no, date_iso, dep),
-                    timeout=LOOKUP_TIMEOUT,
-                )
-                return {
-                    "status": "LIVE_AVAILABLE" if available else "LIVE_SOLD_OUT",
-                    "mode": "LIVE",
-                    "checkedAt": checked_at,
-                }
-            except Exception:
-                if attempt >= MAX_RETRIES:
-                    # 실패 → UNKNOWN. 매진으로 변환하지 않는다 (§5-4)
-                    return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
-                await asyncio.sleep(0.4)
-    return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
+    provider = "KORAIL" if mode in KORAIL_MODES else "SRT" if mode in SRT_MODES else None
+    if provider is None:
+        return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
+
+    dep_name = leg.get("fromName") or leg["from"]
+    arr_name = leg.get("toName") or leg["to"]
+    try:
+        seat_map = await _lookup_route(provider, dep_name, arr_name, date_iso)
+    except Exception:
+        return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
+
+    sold = seat_map.get(train_key(mode, no))
+    if sold is None:
+        # 시간표에는 있는데 좌석 응답에 없는 편 — 판단 불가. 매진으로 단정하지 않는다.
+        return {"status": "UNKNOWN", "mode": "UNAVAILABLE", "checkedAt": checked_at}
+    return {
+        "status": "LIVE_SOLD_OUT" if sold else "LIVE_AVAILABLE",
+        "mode": "LIVE",
+        "checkedAt": checked_at,
+    }

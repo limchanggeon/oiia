@@ -39,25 +39,40 @@ EXPLAIN_SYSTEM_PROMPT = (
 # 숫자·단위가 섞이면 LLM이 값을 지어낸 것으로 보고 폐기한다 (FR-8, §4)
 _FORBIDDEN = re.compile(r"[0-9]|분\s|원|시간|호차|퍼센트|%")
 
+# 최상급 주장은 코드가 판단한 근거(reasons)와 일치할 때만 허용한다.
+# LLM이 실제로는 더 비싼 편에 "가장 저렴한 기차예요"를 붙인 사례가 있었다 (FR-8 위반).
+_CLAIMS = [
+    (re.compile(r"싸|저렴|경제적"), "가장 저렴해요"),
+    (re.compile(r"빠르|빨리|신속"), "가장 빨라요"),
+]
+
 
 def _fmt(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
-def sanitize(text: str, fallback: str) -> str:
-    """LLM이 숫자를 지어냈으면 폐기하고 정형 문구로 대체한다 (FR-8, §4).
+def sanitize(text: str, fallback: str, reasons: Optional[List[str]] = None) -> str:
+    """LLM이 값을 지어냈으면 폐기하고 정형 문구로 대체한다 (FR-8, §4).
 
-    LLM은 시간·요금을 '변경하거나 새로 만들' 수 없다. 문장에 숫자·단위가 섞였다는 건
-    카드의 확정값과 어긋난 값을 만들어냈을 가능성이 있다는 뜻이므로, 검증 없이 쓰지 않는다.
-    (실제로 '10분 빠르고'처럼 실제 차이(5분)와 다른 수치를 생성한 사례가 있었다.)
+    LLM은 시간·요금·좌석을 '판단하거나 새로 만들' 수 없다. 두 가지를 검사한다:
+    1. 숫자·단위 — '10분 빠르고'처럼 실제 차이(5분)와 다른 수치를 만든 사례가 있었다.
+    2. 최상급 주장 — 실제로는 더 비싼 편에 '가장 저렴한 기차예요'를 붙인 사례가 있었다.
+       코드가 판단한 근거(reasons)에 없는 우위 주장은 폐기한다.
     """
     t = (text or "").strip()
     if not t or _FORBIDDEN.search(t):
         return fallback
+    for pattern, required in _CLAIMS:
+        if pattern.search(t) and required not in (reasons or []):
+            return fallback
     return t
 
 
-async def explain_anthropic(journeys: List[Dict[str, Any]], fallbacks: Optional[List[str]] = None) -> List[str]:
+async def explain_anthropic(
+    journeys: List[Dict[str, Any]],
+    fallbacks: Optional[List[str]] = None,
+    reasons: Optional[List[List[str]]] = None,
+) -> List[str]:
     from .anthropic_parser import _get_client
 
     brief = [
@@ -84,4 +99,5 @@ async def explain_anthropic(journeys: List[Dict[str, Any]], fallbacks: Optional[
         raise ValueError("설명문 개수 불일치")
 
     fbs = fallbacks or [""] * len(journeys)
-    return [sanitize(str(e), fb) for e, fb in zip(explanations, fbs)]
+    rs = reasons or [[] for _ in journeys]
+    return [sanitize(str(e), fb, r) for e, fb, r in zip(explanations, fbs, rs)]

@@ -38,23 +38,83 @@ class ScheduleError(RuntimeError):
     """수단별 운행정보 조회 실패 — 해당 수단만 제외한다 (FR-5 예외)."""
 
 
-async def fetch_live(mode: str, origin_id: str, dest_id: str, date_iso: str) -> List[Dict[str, Any]]:
-    """TAGO 실조회 (VER3 §1: 운행정보·요금은 실제 외부 API).
+TRAIN_MODES = ("KTX", "ITX-새마을", "무궁화호", "SRT")
 
+
+async def _fetch_live_train_via_rail(mode: str, origin_id: str, dest_id: str, date_iso: str) -> List[Dict[str, Any]]:
+    """코레일/SRT 조회로 열차 시간표·요금을 얻는다 (TAGO 대체 경로).
+
+    코레일 조회 응답에는 시간표·요금·좌석이 함께 들어 있다. TAGO 키가 없어도
+    열차만은 100% 실데이터로 시연할 수 있게 하는 경로이며, 좌석 판정은
+    tools/seats.py 가 같은 소스를 캐시로 재사용한다 (중복 호출 없음).
+    """
+    from ..core import places
+    from . import seats
+
+    o, d = places.get(origin_id) or {}, places.get(dest_id) or {}
+    dep_name, arr_name = o.get("name", origin_id), d.get("name", dest_id)
+    provider = "SRT" if mode == "SRT" else "KORAIL"
+
+    rows = await seats.fetch_route_rows(provider, dep_name, arr_name, date_iso)
+    legs = []
+    for r in rows:
+        if r["mode"] != mode:
+            continue
+        if r["arrMin"] <= r["depMin"]:
+            # 자정을 넘겨 도착하는 편. 도착 시각이 작은 값(예: 00:03=3분)이라
+            # '마감 이내 도착'으로 오판되므로 하루 범위 여정만 다룬다.
+            continue
+        fare = r.get("fare")
+        if not fare:
+            # 매진 편은 예약 문구에 요금이 없다. 여기서 버리면 '매진 판정' 자체가 사라지므로
+            # 후보로는 남기고 요금은 0으로 둔다 (매진이라 추천 카드에는 오르지 않는다).
+            if not r.get("soldOut"):
+                continue                   # 좌석은 있는데 요금이 없는 편은 총요금 계산 불가 → 제외
+            fare = 0
+        legs.append({
+            "mode": mode,
+            "no": r["no"],
+            "from": origin_id,
+            "to": dest_id,
+            "fromName": dep_name,
+            "toName": arr_name,
+            "dep": r["depMin"],
+            "arr": r["arrMin"],
+            "fare": fare,
+        })
+    if not legs:
+        raise ScheduleError(f"{mode} 운행 편성 없음 (코레일/SRT 조회)")
+    return legs
+
+
+async def fetch_live(mode: str, origin_id: str, dest_id: str, date_iso: str) -> List[Dict[str, Any]]:
+    """운행정보 실조회 (VER3 §1: 운행정보·요금은 실제 외부 API).
+
+    열차: TAGO → 실패 시 코레일/SRT 조회로 대체 (둘 다 실데이터이므로 LIVE 유지)
+    버스: TAGO만 가능
     반환: 정규화된 leg 목록 — mode, no, from, to, fromName, toName, dep, arr, fare
     (좌석 상태는 여기서 채우지 않는다 — tools/seats.py 담당.)
     """
+    from ..core import places
     from . import tago
 
-    if not tago.enabled():
-        raise ScheduleError("TAGO_API_KEY 미설정 — 운행정보 실조회 불가")
-
-    if mode in ("KTX", "SRT", "ITX-새마을"):
-        legs = await tago.fetch_train(origin_id, dest_id, date_iso)
-        legs = [l for l in legs if l["mode"] == mode]   # 한 응답에 여러 등급이 섞여 온다
+    legs: List[Dict[str, Any]] = []
+    if mode in TRAIN_MODES:
+        if tago.enabled():
+            try:
+                all_legs = await tago.fetch_train(origin_id, dest_id, date_iso)
+                legs = [l for l in all_legs if l["mode"] == mode]   # 한 응답에 여러 등급이 섞여 온다
+            except Exception:
+                legs = []
+        if not legs:
+            legs = await _fetch_live_train_via_rail(mode, origin_id, dest_id, date_iso)
     elif mode == "고속버스":
+        if not tago.enabled():
+            raise ScheduleError("TAGO_API_KEY 미설정 — 버스 운행정보 실조회 불가")
         legs = await tago.fetch_bus(origin_id, dest_id, date_iso, express=True)
     elif mode == "시외버스":
+        if not tago.enabled():
+            raise ScheduleError("TAGO_API_KEY 미설정 — 버스 운행정보 실조회 불가")
         legs = await tago.fetch_bus(origin_id, dest_id, date_iso, express=False)
     else:
         raise ScheduleError(f"지원하지 않는 수단: {mode}")
@@ -62,11 +122,10 @@ async def fetch_live(mode: str, origin_id: str, dest_id: str, date_iso: str) -> 
     if not legs:
         raise ScheduleError(f"{mode} 운행 편성 없음")
 
-    from ..core import places
     o, d = places.get(origin_id) or {}, places.get(dest_id) or {}
     for l in legs:
-        l["fromName"] = o.get("name", origin_id)
-        l["toName"] = d.get("name", dest_id)
+        l.setdefault("fromName", o.get("name", origin_id))
+        l.setdefault("toName", d.get("name", dest_id))
     return legs
 
 

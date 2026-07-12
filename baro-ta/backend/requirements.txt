@@ -3,3 +3,8 @@ uvicorn[standard]>=0.29
 anthropic>=0.40
 httpx>=0.27
 python-dotenv>=1.0
+
+# 열차 좌석·시간표 실시간 조회 (VER3 FR-6) — 조회 전용, 예약 함수 미사용
+korail2-ncard
+SRTrain
+pycryptodome

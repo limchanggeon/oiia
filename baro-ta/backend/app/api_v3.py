@@ -106,7 +106,9 @@ def _validate(step: str, data: Dict[str, Any]) -> tuple[bool, str]:
 
 @router.post("/input/validate", response_model=ValidateStepResponse)
 async def validate_step(body: ValidateStepRequest) -> ValidateStepResponse:
-    data = body.input.model_dump(exclude_none=True)
+    # exclude_unset: 클라이언트가 **보낸 필드만** 갱신한다.
+    # (exclude_none만 쓰면 passengers 기본값 0명이 항상 실려 와 이전 입력을 덮어쓴다.)
+    data = body.input.model_dump(exclude_none=True, exclude_unset=True)
     saved = db.input_get(body.sessionId)
     saved.update(data)                      # [이전]으로 돌아가도 값 유지 (FR-3)
     db.input_save(body.sessionId, saved)
@@ -178,7 +180,9 @@ async def search(body: SearchRequest) -> SearchResponse:
                 "transfers": j["transfers"], "dep": j["dep"], "arr": j["arr"],
                 "legs": [{"mode": l["mode"]} for l in j["legs"]],
             } for j in cards]
-            texts = await explain_anthropic(brief, fallbacks=formulaic)
+            texts = await explain_anthropic(
+                brief, fallbacks=formulaic, reasons=[j["reasons"] for j in cards]
+            )
             for j, t in zip(cards, texts):
                 j["explain"] = t
             engine = "anthropic"

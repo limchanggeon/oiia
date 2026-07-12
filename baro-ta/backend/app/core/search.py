@@ -116,10 +116,13 @@ def _make_journey(
 async def _attach_seats(
     legs: List[Dict[str, Any]], date_iso: str, sold_out_all: bool, seat_fail: bool
 ) -> None:
-    """구간별 좌석 상태를 병렬 조회해 붙인다 (동시성 제한은 seats 모듈이 관리)."""
+    """구간별 좌석 상태를 병렬 조회해 붙인다.
+
+    같은 구간의 여러 편성은 seats 모듈이 한 번의 외부 조회로 합쳐 처리한다
+    (in-flight 병합 + 60초 캐시 — §2 중복 호출 억제).
+    """
     results = await asyncio.gather(*[
-        seats.lookup(l["mode"], l["no"], date_iso, l["dep"],
-                     force_sold_out=sold_out_all, force_fail=seat_fail)
+        seats.lookup(l, date_iso, force_sold_out=sold_out_all, force_fail=seat_fail)
         for l in legs
     ])
     for leg, r in zip(legs, results):
@@ -162,6 +165,13 @@ async def search(
         log.append(("SEARCH", f"운행정보 조회 실패 → 제외: {', '.join(excluded_sources)}"))
     if fell_back:
         log.append(("SEARCH", f"운행정보 실조회 실패 → 시뮬레이션 전환(카드에 표시): {', '.join(fell_back)}"))
+
+    # 자정 넘김 편 방어 — 어떤 소스에서 들어오든 여기서 한 번 더 막는다.
+    # (도착 시각이 출발보다 작으면 다음날 도착이므로 '마감 이내'로 오판된다.)
+    bad = [c for c in candidates if c["leg"]["arr"] <= c["leg"]["dep"]]
+    if bad:
+        candidates = [c for c in candidates if c["leg"]["arr"] > c["leg"]["dep"]]
+        log.append(("SEARCH", f"자정 넘김 편 {len(bad)}건 제외"))
 
     # 당일 검색: 이미 출발한 편은 탈 수 없다 (여유 10분 미만 포함)
     if date_iso == dt.date.today().isoformat():
